@@ -1,0 +1,37 @@
+from typing import TYPE_CHECKING
+from uuid import uuid4
+
+from sqlalchemy import Column, String, DateTime, ForeignKey, Text
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+
+from app.db.base_class import Base
+
+if TYPE_CHECKING:
+    from app.models.user import User
+
+
+class Store(Base):
+    __tablename__ = "stores"
+
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
+    tenant_id = Column(PGUUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
+    name = Column(String(255), nullable=False, index=True)
+    address = Column(Text, nullable=True)
+    phone = Column(String(50), nullable=True)
+    email = Column(String(255), nullable=True)
+    status = Column(String(50), default="active", index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Define the actual SQLAlchemy relationships
+    tenant = relationship("Tenant", back_populates="stores")
+    products = relationship("Product", back_populates="store", cascade="all, delete-orphan")
+    customers = relationship("Customer", back_populates="store", cascade="all, delete-orphan")
+    sales = relationship("Sale", back_populates="store", cascade="all, delete-orphan")
+    settings = relationship("Setting", back_populates="store", cascade="all, delete-orphan")
+    users = relationship("User", foreign_keys="User.store_id", back_populates="store")
+
+    def __repr__(self):
+        return f"<Store(id={self.id}, name={self.name}, tenant_id={self.tenant_id})>"
