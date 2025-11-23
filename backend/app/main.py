@@ -22,24 +22,36 @@ async def lifespan(app: FastAPI):
     logger = logging.getLogger(__name__)
     logger.info("POS application starting up...", extra={'action': 'application_startup'})
 
+    # Try database connection but don't fail startup if it's not available
     try:
         async with engine.begin() as conn:
             await conn.execute(text("SELECT 1"))
         logger.info("Database connection established successfully")
-        logger.info("POS application startup completed", extra={'action': 'startup_complete'})
     except Exception as e:
-        logger.error(f"Failed to start application: {str(e)}", extra={'action': 'startup_failed'})
-        raise
+        logger.warning(f"Database connection failed: {str(e)}")
+        logger.info("Application will continue without database connection")
 
+    # Initialize Supabase client
+    try:
+        from app.core.supabase_client import is_supabase_available
+        if is_supabase_available():
+            logger.info("Supabase client initialized successfully")
+        else:
+            logger.warning("Supabase client not available - storage features will be disabled")
+    except Exception as e:
+        logger.warning(f"Supabase initialization failed: {str(e)}")
+
+    logger.info("POS application startup completed", extra={'action': 'startup_complete'})
     yield
 
     logger.info("FA POS application shutting down...", extra={'action': 'application_shutdown'})
     try:
         await engine.dispose()
         logger.info("Database connections closed")
-        logger.info("FA POS application shutdown completed", extra={'action': 'shutdown_complete'})
     except Exception as e:
-        logger.error(f"Error during shutdown: {str(e)}", extra={'action': 'shutdown_error'})
+        logger.warning(f"Error during database shutdown: {str(e)}")
+
+    logger.info("FA POS application shutdown completed", extra={'action': 'shutdown_complete'})
 
 
 def create_application() -> FastAPI:
@@ -219,28 +231,40 @@ def create_application() -> FastAPI:
 
     @app.get("/health")
     async def health_check():
+        health_status = {
+            "status": "healthy",
+            "service": settings.project_name,
+            "environment": settings.app_env,
+            "database": "disconnected",
+            "supabase": "disconnected"
+        }
+
+        # Check database connection
         try:
             async with engine.begin() as conn:
                 await conn.execute(text("SELECT 1"))
-
-            return {
-                "status": "healthy",
-                "service": settings.project_name,
-                "environment": settings.app_env,
-                "database": "connected"
-            }
+            health_status["database"] = "connected"
         except Exception as e:
-            logger.error(f"Health check failed: {str(e)}")
+            logger.warning(f"Database health check failed: {str(e)}")
+
+        # Check Supabase connection
+        try:
+            from app.core.supabase_client import is_supabase_available
+            if is_supabase_available():
+                health_status["supabase"] = "connected"
+        except Exception as e:
+            logger.warning(f"Supabase health check failed: {str(e)}")
+
+        # Determine overall status
+        overall_status = "healthy" if health_status["database"] == "connected" else "degraded"
+
+        if overall_status == "degraded":
             return JSONResponse(
                 status_code=503,
-                content={
-                    "status": "unhealthy",
-                    "service": settings.project_name,
-                    "environment": settings.app_env,
-                    "database": "disconnected",
-                    "error": str(e)
-                }
+                content={**health_status, "status": "degraded"}
             )
+
+        return health_status
 
     app.include_router(api_router, prefix=settings.api_prefix)
 
