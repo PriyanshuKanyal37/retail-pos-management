@@ -32,7 +32,6 @@ supabase-py-async==0.1.0
 
 # Logging & Monitoring
 structlog==23.2.0
-rich==13.7.0
 
 # Rate Limiting
 slowapi==0.1.9
@@ -47,7 +46,6 @@ pytest==7.4.3
 pytest-asyncio==0.21.1
 pytest-cov==4.1.0
 factory-boy==3.3.0
-
 # Environment Management
 python-dotenv==1.0.0
 
