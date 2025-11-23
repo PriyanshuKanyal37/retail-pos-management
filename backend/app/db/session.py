@@ -7,6 +7,9 @@ engine = create_async_engine(
     echo=settings.app_env == "development",
     pool_size=5,
     max_overflow=10,
+    # Supabase sits behind PgBouncer in transaction mode; disabling the asyncpg
+    # statement cache prevents DuplicatePreparedStatement errors there.
+    connect_args={"statement_cache_size": 0},
 )
 
 AsyncSessionLocal = async_sessionmaker[AsyncSession](
@@ -19,4 +22,3 @@ async def get_db() -> AsyncSession:
     """FastAPI dependency that yields an async DB session."""
     async with AsyncSessionLocal() as session:
         yield session
-
