@@ -20,15 +20,10 @@ pydantic-settings==2.1.0
 email-validator==2.1.0
 
 # HTTP Client
-httpx==0.24.2
+httpx==0.24.1
 
 # Storage Integration
 supabase==2.3.1
-storage3==0.5.3
-postgrest==0.16.0
-realtime==0.0.5
-gotrue==2.10.0
-supabase-py-async==0.1.0
 
 # Logging & Monitoring
 structlog==23.2.0
