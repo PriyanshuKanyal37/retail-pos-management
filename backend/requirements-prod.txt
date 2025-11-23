@@ -1,3 +1,6 @@
+# Production Requirements Only
+# Copy this file to requirements.txt for deployment
+
 # Core Framework
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
@@ -23,30 +26,15 @@ email-validator==2.1.0
 httpx==0.24.2
 
 # Storage Integration
-supabase==2.3.1
+supabase==2.3.0
 storage3==0.5.3
-postgrest==0.16.0
-realtime==0.0.5
-gotrue==2.10.0
-supabase-py-async==0.1.0
 
 # Logging & Monitoring
 structlog==23.2.0
-rich==13.7.0
 
 # Rate Limiting
 slowapi==0.1.9
 limits==3.7.0
-
-# Background Tasks (Optional - remove if not using)
-# celery==5.3.4
-# redis==5.0.1
-
-# Development & Testing
-pytest==7.4.3
-pytest-asyncio==0.21.1
-pytest-cov==4.1.0
-factory-boy==3.3.0
 
 # Environment Management
 python-dotenv==1.0.0

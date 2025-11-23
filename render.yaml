@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: fapos-backend
+    runtime: python
+    plan: free
+    rootDirectory: backend
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: PROJECT_NAME
+        value: FA POS Backend
+      - key: API_PREFIX
+        value: /api/v1
+      - key: SUPABASE_DB_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_PROJECT_URL
+        sync: false
+      - key: SUPABASE_PRODUCTS_BUCKET
+        value: products
+      - key: SUPABASE_INVOICES_BUCKET
+        value: invoices
+      - key: SUPABASE_BRANDING_BUCKET
+        value: branding
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: 30
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: 7
