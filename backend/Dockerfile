@@ -1,20 +1,19 @@
-# Use Python 3.11.9 as base image
 FROM python:3.11.9-slim
 
-# Set working directory
+# Create working directory
 WORKDIR /app
 
-# Copy requirements file
-COPY requirements.txt .
+# Copy requirements from backend folder
+COPY backend/requirements.txt .
 
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application
-COPY . .
+# Copy backend application source
+COPY backend/ .
 
-# Expose port
+# Expose port (Railway sets PORT automatically)
 EXPOSE 8000
 
-# Command to run the application
+# Run the app
 CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
