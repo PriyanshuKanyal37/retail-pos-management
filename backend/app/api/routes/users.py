@@ -2,7 +2,7 @@ from typing import Sequence
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.api.deps import (
     get_current_user,
@@ -27,7 +27,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 
 @router.get("/me", response_model=UserResponse)
-async def get_current_user_profile(
+def get_current_user_profile(
     current_user: User = Depends(get_current_user),
 ) -> UserResponse:
     """Get current logged-in user's profile."""
@@ -35,9 +35,9 @@ async def get_current_user_profile(
 
 
 @router.get("/", response_model=list[UserResponse])
-async def get_users(
+def get_users(
     current_user: User = Depends(require_manager),
-    session: AsyncSession = Depends(get_db_session),
+    session: Session = Depends(get_db_session),
     tenant_id: UUID = Depends(get_tenant_id),
     store_id: UUID | None = Query(None, description="Filter by store ID"),
     role: str | None = Query(None, description="Filter by role"),
@@ -49,7 +49,7 @@ async def get_users(
     """
     if current_user.role == "super_admin":
         # Super admin can see all users with optional filters
-        return await list_users(
+        return list_users(
             session,
             tenant_id=tenant_id,
             store_id=store_id,
@@ -58,7 +58,7 @@ async def get_users(
     elif current_user.role == "manager":
         # Manager can only see users in their assigned stores
         # For now, get all users in tenant and filter by manager's stores
-        all_users = await list_users(session, tenant_id=tenant_id, role=role)
+        all_users = list_users(session, tenant_id=tenant_id, role=role)
 
         # Filter to show only cashiers assigned to this manager and the manager themselves
         filtered_users = [
@@ -73,10 +73,10 @@ async def get_users(
 
 
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def create_user_endpoint(
+def create_user_endpoint(
     payload: UserCreate,
     current_user: User = Depends(require_manager),
-    session: AsyncSession = Depends(get_db_session),
+    session: Session = Depends(get_db_session),
     tenant_id: UUID = Depends(get_tenant_id),
     store_id: UUID | None = Depends(get_store_id),
 ) -> User:
@@ -114,7 +114,7 @@ async def create_user_endpoint(
             # Super admin can create any user type, no additional restrictions
             pass
 
-        return await create_user(session, payload)
+        return create_user(session, payload)
     except DuplicateEmailError:
         raise HTTPException(status_code=409, detail="Email already in use")
     except InvalidManagerError as exc:
@@ -122,11 +122,11 @@ async def create_user_endpoint(
 
 
 @router.patch("/{user_id}", response_model=UserResponse)
-async def update_user_endpoint(
+def update_user_endpoint(
     user_id: UUID,
     payload: UserUpdate,
     current_user: User = Depends(require_manager),
-    session: AsyncSession = Depends(get_db_session),
+    session: Session = Depends(get_db_session),
 ) -> User:
     """
     Update a user based on role:
@@ -138,7 +138,7 @@ async def update_user_endpoint(
         if current_user.role == "manager":
             # Get the user to be updated
             from app.crud.crud_user import crud_user
-            target_user = await crud_user.get(session, id=user_id)
+            target_user =  crud_user.get(session, id=user_id)
 
             if not target_user:
                 raise HTTPException(status_code=404, detail="User not found")
@@ -158,7 +158,7 @@ async def update_user_endpoint(
                     detail="You cannot change user roles"
                 )
 
-        user = await update_user(session, user_id, payload)
+        user = update_user(session, user_id, payload)
     except InvalidManagerError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -168,10 +168,10 @@ async def update_user_endpoint(
 
 
 @router.get("/store/{store_id}", response_model=list[UserResponse])
-async def get_users_by_store(
+def get_users_by_store(
     store_id: UUID,
     current_user: User = Depends(require_manager),
-    session: AsyncSession = Depends(get_db_session),
+    session: Session = Depends(get_db_session),
     tenant_id: UUID = Depends(get_tenant_id),
 ) -> Sequence[User]:
     """
@@ -188,24 +188,24 @@ async def get_users_by_store(
                 detail="You can only access users from your assigned store"
             )
 
-    return await list_users(session, tenant_id=tenant_id, store_id=store_id)
+    return list_users(session, tenant_id=tenant_id, store_id=store_id)
 
 
 @router.get("/managers", response_model=list[UserResponse])
-async def get_managers(
+def get_managers(
     current_user: User = Depends(require_super_admin),
-    session: AsyncSession = Depends(get_db_session),
+    session: Session = Depends(get_db_session),
     tenant_id: UUID = Depends(get_tenant_id),
 ) -> Sequence[User]:
     """Get all managers for a tenant (super admin only)."""
-    return await list_users(session, tenant_id=tenant_id, role="manager")
+    return list_users(session, tenant_id=tenant_id, role="manager")
 
 
 @router.delete("/{user_id}", status_code=204)
-async def delete_user(
+def delete_user(
     user_id: UUID,
     current_user: User = Depends(require_manager),
-    session: AsyncSession = Depends(get_db_session),
+    session: Session = Depends(get_db_session),
     tenant_id: UUID = Depends(get_tenant_id),
 ):
     """
@@ -220,7 +220,7 @@ async def delete_user(
     from app.crud.crud_user import crud_user
 
     # Prevent deletion of Super Admins
-    user_to_delete = await crud_user.get(session, user_id)
+    user_to_delete = crud_user.get(session, user_id)
     if not user_to_delete:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -266,7 +266,7 @@ async def delete_user(
         )
 
     # Delete the user using CRUD remove method
-    deleted_user = await crud_user.remove(session, id=user_id, tenant_id=tenant_id)
+    deleted_user = crud_user.remove(session, id=user_id, tenant_id=tenant_id)
     if not deleted_user:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

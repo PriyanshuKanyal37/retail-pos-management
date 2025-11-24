@@ -1,32 +1,31 @@
-from typing import Annotated, Tuple
+from typing import Annotated, Tuple, Generator
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError
 from sqlalchemy import select, and_
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.security import decode_token, get_tenant_id_from_token
-from app.db.session import AsyncSessionAdapter, SessionLocal
+from app.db.session import SessionLocal
 from app.models.user import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.api_prefix}/auth/login")
 
 
-async def get_db_session():
+def get_db_session() -> Generator[Session, None, None]:
     db = SessionLocal()
-    adapter = AsyncSessionAdapter(db)
     try:
-        yield adapter
+        yield db
     finally:
-        await adapter.close()
+        db.close()
 
 
-async def get_current_user_with_tenant(
+def get_current_user_with_tenant(
     token: Annotated[str, Depends(oauth2_scheme)],
-    session: Annotated[AsyncSession, Depends(get_db_session)],
+    session: Annotated[Session, Depends(get_db_session)],
 ) -> Tuple[User, UUID]:
     """Get current user and their tenant_id from JWT token"""
     credentials_exception = HTTPException(
@@ -45,7 +44,7 @@ async def get_current_user_with_tenant(
         raise credentials_exception
 
     # Get user and verify tenant_id matches
-    result = await session.execute(
+    result = session.execute(
         select(User).where(
             and_(
                 User.id == UUID(user_id),
@@ -61,7 +60,7 @@ async def get_current_user_with_tenant(
     return user, UUID(tenant_id)
 
 
-async def get_current_user(
+def get_current_user(
     user_tenant: Annotated[Tuple[User, UUID], Depends(get_current_user_with_tenant)]
 ) -> User:
     """Dependency to get current user (backward compatibility)"""
@@ -69,7 +68,7 @@ async def get_current_user(
     return user
 
 
-async def get_tenant_id(
+def get_tenant_id(
     user_tenant: Annotated[Tuple[User, UUID], Depends(get_current_user_with_tenant)]
 ) -> UUID:
     """Dependency to get tenant_id from authenticated user"""
@@ -98,7 +97,7 @@ def require_manager(user: Annotated[User, Depends(get_current_user)]) -> User:
     return user
 
 
-async def get_store_id(
+def get_store_id(
     current_user: Annotated[User, Depends(get_current_user)]
 ) -> UUID | None:
     """Get store_id from current user context"""
@@ -110,19 +109,19 @@ from app.services.storage_service import SupabaseStorageService
 from app.services.product_service import ProductService
 from app.services.sales_service import SalesService
 
-async def get_storage_service() -> SupabaseStorageService:
+def get_storage_service() -> SupabaseStorageService:
     """Get storage service dependency"""
     return SupabaseStorageService()
 
-async def get_product_service(
-    db: AsyncSession = Depends(get_db_session),
+def get_product_service(
+    db: Session = Depends(get_db_session),
     storage: SupabaseStorageService = Depends(get_storage_service)
 ) -> ProductService:
     """Get product service dependency"""
     return ProductService(db, storage)
 
-async def get_sales_service(
-    db: AsyncSession = Depends(get_db_session),
+def get_sales_service(
+    db: Session = Depends(get_db_session),
     storage: SupabaseStorageService = Depends(get_storage_service)
 ) -> SalesService:
     """Get sales service dependency"""

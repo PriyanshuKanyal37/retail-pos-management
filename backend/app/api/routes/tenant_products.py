@@ -2,7 +2,7 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db_session, get_tenant_id, require_admin
 from app.models.user import User
@@ -12,13 +12,17 @@ from app.services.tenant_products import (
     DuplicateSKUError,
     TenantProductService,
 )
-from app.services.storage import StorageError, delete_product_image, upload_product_image
+from app.services.storage import (
+    StorageError,
+    delete_product_image as storage_delete_product_image,
+    upload_product_image as storage_upload_product_image,
+)
 
 router = APIRouter(prefix="/products", tags=["products"])
 
 
 def get_product_service(
-    session: AsyncSession = Depends(get_db_session),
+    session: Session = Depends(get_db_session),
     tenant_id: UUID = Depends(get_tenant_id),
 ) -> TenantProductService:
     """Dependency to get tenant-aware product service"""
@@ -26,7 +30,7 @@ def get_product_service(
 
 
 @router.get("/")
-async def get_products(
+def get_products(
     service: TenantProductService = Depends(get_product_service),
     category: Optional[str] = Query(None, description="Filter by category"),
     search: Optional[str] = Query(None, description="Search term"),
@@ -35,7 +39,7 @@ async def get_products(
 ):
     """Get all products for the current tenant with optional filtering."""
     query = service.build_filtered_query(category=category, search=search, status=status)
-    result = await service.session.execute(query)
+    result =  service.session.execute(query)
     products = result.scalars().all()
 
     return [
@@ -57,13 +61,13 @@ async def get_products(
 
 
 @router.get("/low-stock")
-async def get_low_stock_products(
+def get_low_stock_products(
     threshold: int = Query(20, ge=1, description="Stock threshold"),
     service: TenantProductService = Depends(get_product_service),
     current_user: User = Depends(get_current_user),
 ):
     """Get products with stock below threshold for the current tenant."""
-    products = await service.get_low_stock_products(threshold)
+    products =  service.get_low_stock_products(threshold)
 
     return [
         ProductResponse(
@@ -84,13 +88,13 @@ async def get_low_stock_products(
 
 
 @router.get("/{product_id}")
-async def get_product(
+def get_product(
     product_id: UUID,
     service: TenantProductService = Depends(get_product_service),
     current_user: User = Depends(get_current_user),
 ):
     """Get a specific product by ID for the current tenant."""
-    product = await service.get_by_id(product_id)
+    product =  service.get_by_id(product_id)
 
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -111,7 +115,7 @@ async def get_product(
 
 
 @router.post("/", response_model=ProductResponse, status_code=201)
-async def create_product(
+def create_product(
     product_data: ProductCreate,
     service: TenantProductService = Depends(get_product_service),
     current_user: User = Depends(require_admin),  # Only admins can create products
@@ -129,7 +133,7 @@ async def create_product(
             )
 
         product_dict['store_id'] = current_user.store_id
-        product = await service.create(product_dict)
+        product =  service.create(product_dict)
 
         return ProductResponse(
             id=str(product.id),
@@ -152,7 +156,7 @@ async def create_product(
 
 
 @router.patch("/{product_id}", response_model=ProductResponse)
-async def update_product(
+def update_product(
     product_id: UUID,
     product_data: ProductUpdate,
     service: TenantProductService = Depends(get_product_service),
@@ -160,7 +164,7 @@ async def update_product(
 ):
     """Update a product for the current tenant."""
     try:
-        product = await service.update(product_id, product_data.model_dump(exclude_unset=True))
+        product = service.update(product_id, product_data.model_dump(exclude_unset=True))
 
         if not product:
             raise HTTPException(status_code=404, detail="Product not found")
@@ -185,27 +189,27 @@ async def update_product(
 
 
 @router.delete("/{product_id}", status_code=204)
-async def delete_product(
+def delete_product(
     product_id: UUID,
     service: TenantProductService = Depends(get_product_service),
     current_user: User = Depends(require_admin),  # Only admins can delete products
 ):
     """Soft delete a product for the current tenant."""
-    success = await service.soft_delete(product_id)
+    success = service.soft_delete(product_id)
 
     if not success:
         raise HTTPException(status_code=404, detail="Product not found")
 
 
 @router.post("/{product_id}/image", response_model=dict)
-async def upload_product_image(
+def upload_product_image(
     product_id: UUID,
     file: UploadFile = File(...),
     service: TenantProductService = Depends(get_product_service),
     current_user: User = Depends(require_admin),  # Only admins can upload images
 ):
     """Upload an image for a product in the current tenant."""
-    product = await service.get_by_id(product_id)
+    product = service.get_by_id(product_id)
 
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -218,10 +222,10 @@ async def upload_product_image(
 
     try:
         # Upload image using storage service
-        image_url = await upload_product_image(file.file, file.filename)
+        image_url = storage_upload_product_image(file.file, file.filename)
 
         # Update product with new image URL
-        await service.update(product_id, {"img_url": image_url})
+        service.update(product_id, {"img_url": image_url})
 
         return {"image_url": image_url}
     except StorageError as exc:
@@ -229,13 +233,13 @@ async def upload_product_image(
 
 
 @router.delete("/{product_id}/image", status_code=204)
-async def delete_product_image(
+def delete_product_image(
     product_id: UUID,
     service: TenantProductService = Depends(get_product_service),
     current_user: User = Depends(require_admin),  # Only admins can delete images
 ):
     """Delete the image for a product in the current tenant."""
-    product = await service.get_by_id(product_id)
+    product = service.get_by_id(product_id)
 
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -243,9 +247,9 @@ async def delete_product_image(
     if product.img_url:
         try:
             # Delete image using storage service
-            await delete_product_image(str(product_id))
+            storage_delete_product_image(str(product_id))
 
             # Update product to remove image URL
-            await service.update(product_id, {"img_url": None})
+            service.update(product_id, {"img_url": None})
         except StorageError as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc

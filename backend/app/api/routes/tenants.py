@@ -2,7 +2,7 @@ from typing import Optional, List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db_session, require_admin
 from app.models.user import User
@@ -26,19 +26,19 @@ from app.utils.error_handlers import handle_service_errors
 router = APIRouter(prefix="/tenants", tags=["tenants"])
 
 
-def get_tenant_service(session: AsyncSession = Depends(get_db_session)) -> TenantManagementService:
+def get_tenant_service(session: Session = Depends(get_db_session)) -> TenantManagementService:
     """Dependency to get tenant management service."""
     return TenantManagementService(session)
 
 
-def get_tenant_auth_service(session: AsyncSession = Depends(get_db_session)) -> TenantAuthService:
+def get_tenant_auth_service(session: Session = Depends(get_db_session)) -> TenantAuthService:
     """Dependency to get tenant auth service."""
     return TenantAuthService(session)
 
 
 @router.post("/", response_model=TenantResponse, status_code=201)
 @handle_service_errors
-async def create_tenant(
+def create_tenant(
     tenant_data: TenantCreate,
     service: TenantManagementService = Depends(get_tenant_service),
     current_user: User = Depends(require_admin),  # Only super admins can create tenants
@@ -49,7 +49,7 @@ async def create_tenant(
     Only system administrators can create new tenants. This creates the tenant
     organization and prepares it for user registration.
     """
-    tenant = await service.create_tenant(tenant_data)
+    tenant =  service.create_tenant(tenant_data)
 
     return TenantResponse(
         id=tenant.id,
@@ -62,7 +62,7 @@ async def create_tenant(
 
 @router.get("/", response_model=List[TenantResponse])
 @handle_service_errors
-async def get_tenants(
+def get_tenants(
     include_inactive: bool = Query(False, description="Include inactive tenants"),
     service: TenantManagementService = Depends(get_tenant_service),
     current_user: User = Depends(require_admin),  # Only admins can view all tenants
@@ -72,7 +72,7 @@ async def get_tenants(
 
     System administrators can view all tenants in the system.
     """
-    tenants = await service.get_all_tenants(include_inactive)
+    tenants =  service.get_all_tenants(include_inactive)
 
     return [
         TenantResponse(
@@ -88,7 +88,7 @@ async def get_tenants(
 
 @router.get("/{tenant_id}", response_model=TenantResponse)
 @handle_service_errors
-async def get_tenant(
+def get_tenant(
     tenant_id: UUID,
     service: TenantManagementService = Depends(get_tenant_service),
     current_user: User = Depends(require_admin),  # Only admins can view tenant details
@@ -98,7 +98,7 @@ async def get_tenant(
 
     System administrators can view detailed information about any tenant.
     """
-    tenant = await service.get_tenant_by_id(tenant_id)
+    tenant =  service.get_tenant_by_id(tenant_id)
 
     if not tenant:
         raise HTTPException(
@@ -117,7 +117,7 @@ async def get_tenant(
 
 @router.patch("/{tenant_id}", response_model=TenantResponse)
 @handle_service_errors
-async def update_tenant(
+def update_tenant(
     tenant_id: UUID,
     tenant_data: TenantUpdate,
     service: TenantManagementService = Depends(get_tenant_service),
@@ -129,7 +129,7 @@ async def update_tenant(
     System administrators can modify tenant details such as name,
     domain, and status.
     """
-    tenant = await service.update_tenant(tenant_id, tenant_data)
+    tenant =  service.update_tenant(tenant_id, tenant_data)
 
     if not tenant:
         raise HTTPException(
@@ -148,7 +148,7 @@ async def update_tenant(
 
 @router.delete("/{tenant_id}", status_code=status.HTTP_204_NO_CONTENT)
 @handle_service_errors
-async def delete_tenant(
+def delete_tenant(
     tenant_id: UUID,
     service: TenantManagementService = Depends(get_tenant_service),
     current_user: User = Depends(require_admin),  # Only admins can deactivate tenants
@@ -159,12 +159,12 @@ async def delete_tenant(
     This deactivates the tenant but preserves all data for compliance
     and potential reactivation.
     """
-    await service.deactivate_tenant(tenant_id)
+     service.deactivate_tenant(tenant_id)
 
 
 @router.get("/{tenant_id}/statistics", response_model=TenantStatisticsResponse)
 @handle_service_errors
-async def get_tenant_statistics(
+def get_tenant_statistics(
     tenant_id: UUID,
     service: TenantManagementService = Depends(get_tenant_service),
     current_user: User = Depends(require_admin),  # Only admins can view tenant statistics
@@ -176,7 +176,7 @@ async def get_tenant_statistics(
     customer data, and sales information for the specified tenant.
     """
     try:
-        statistics = await service.get_tenant_statistics(tenant_id)
+        statistics =  service.get_tenant_statistics(tenant_id)
         return statistics
     except TenantNotFoundError:
         raise HTTPException(
@@ -192,7 +192,7 @@ async def get_tenant_statistics(
 
 @router.post("/{tenant_id}/users", response_model=TenantUserResponse, status_code=201)
 @handle_service_errors
-async def create_tenant_user(
+def create_tenant_user(
     tenant_id: UUID,
     user_data: TenantUserCreate,
     auth_service: TenantAuthService = Depends(get_tenant_auth_service),
@@ -206,7 +206,7 @@ async def create_tenant_user(
     """
     # Validate tenant exists and is active
     tenant_service = TenantManagementService(auth_service.session)
-    tenant = await tenant_service.get_tenant_by_id(tenant_id)
+    tenant =  tenant_service.get_tenant_by_id(tenant_id)
 
     if not tenant:
         raise HTTPException(
@@ -220,7 +220,7 @@ async def create_tenant_user(
             detail="Cannot create users for inactive tenants"
         )
 
-    user = await auth_service.create_user_with_tenant(
+    user =  auth_service.create_user_with_tenant(
         user_data.user,
         tenant_id,
         current_user.role
@@ -239,9 +239,9 @@ async def create_tenant_user(
 
 @router.get("/{tenant_id}/users", response_model=List[TenantUserResponse])
 @handle_service_errors
-async def get_tenant_users(
+def get_tenant_users(
     tenant_id: UUID,
-    session: AsyncSession = Depends(get_db_session),
+    session: Session = Depends(get_db_session),
     current_user: User = Depends(require_admin),  # Only admins can view tenant users
 ) -> List[TenantUserResponse]:
     """
@@ -251,7 +251,7 @@ async def get_tenant_users(
     """
     # Validate tenant exists
     tenant_service = TenantManagementService(session)
-    tenant = await tenant_service.get_tenant_by_id(tenant_id)
+    tenant =  tenant_service.get_tenant_by_id(tenant_id)
 
     if not tenant:
         raise HTTPException(
@@ -263,7 +263,7 @@ async def get_tenant_users(
     from sqlalchemy import select
     from app.models.user import User
 
-    result = await session.execute(
+    result =  session.execute(
         select(User).where(User.tenant_id == tenant_id).order_by(User.name.asc())
     )
     users = result.scalars().all()
@@ -284,7 +284,7 @@ async def get_tenant_users(
 
 @router.get("/count/active")
 @handle_service_errors
-async def get_active_tenants_count(
+def get_active_tenants_count(
     service: TenantManagementService = Depends(get_tenant_service),
     current_user: User = Depends(require_admin),  # Only admins can view tenant counts
 ) -> dict:
@@ -294,5 +294,5 @@ async def get_active_tenants_count(
     System administrators can monitor the number of active tenants
     in the system.
     """
-    count = await service.get_active_tenants_count()
+    count =  service.get_active_tenants_count()
     return {"active_tenants": count}

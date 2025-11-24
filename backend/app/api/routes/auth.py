@@ -1,22 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.ext.asyncio import AsyncSession
-from uuid import UUID
+from sqlalchemy.orm import Session
 
-from app.api.deps import get_db_session, get_tenant_id
-from app.schemas.tenant import UserCreate, UserResponse, LoginRequest, LoginResponse, TenantCreate
-from app.services.tenant_auth import TenantAuthService
+from app.api.deps import get_db_session
+from app.schemas.tenant import UserCreate, LoginResponse, TenantCreate
+from app.services.tenant_auth import TenantAuthService, AuthError
 from app.services.tenant_management import TenantManagementService
-from app.services.tenant_auth import AuthError
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/signup", response_model=dict, status_code=status.HTTP_201_CREATED)
 @router.post("/signup/", response_model=dict, status_code=status.HTTP_201_CREATED, include_in_schema=False)
-async def signup(
+def signup(
     user_data: UserCreate,
-    session: AsyncSession = Depends(get_db_session),
+    session: Session = Depends(get_db_session),
 ):
     """Register a new user (signup)."""
     try:
@@ -31,15 +29,15 @@ async def signup(
         # Create unique tenant for each super admin
         tenant_name = f"{user_data.name}'s Store"
         # Check if super admin with this email already exists
-        existing_admin = await auth_service.get_user_by_email_for_tenant(user_data.email, None)
+        existing_admin = auth_service.get_user_by_email_for_tenant(user_data.email, None)
         if existing_admin:
             raise AuthError("Super admin with this email already exists")
 
         tenant_data = TenantCreate(name=tenant_name, domain=None)
-        tenant = await tenant_service.create_tenant(tenant_data)
+        tenant = tenant_service.create_tenant(tenant_data)
 
         # Create the user with tenant context
-        login_response = await auth_service.register_user(
+        login_response = auth_service.register_user(
             user_data.email,
             user_data.password,
             user_data.name,
@@ -78,16 +76,16 @@ async def signup(
 
 @router.post("/login", response_model=dict)
 @router.post("/login/", response_model=dict, include_in_schema=False)
-async def login(
+def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
-    session: AsyncSession = Depends(get_db_session),
+    session: Session = Depends(get_db_session),
 ):
     try:
         # Initialize tenant auth service
         auth_service = TenantAuthService(session)
 
         # Authenticate user with tenant context
-        login_response = await auth_service.authenticate_user(
+        login_response = auth_service.authenticate_user(
             form_data.username,
             form_data.password
         )

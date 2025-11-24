@@ -7,6 +7,7 @@ import json
 from typing import Optional, List, Type, TypeVar
 from uuid import UUID
 
+import anyio
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, status
 from pydantic import BaseModel, ValidationError
 
@@ -31,7 +32,7 @@ ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 MAX_IMAGE_SIZE = 5 * 1024 * 1024
 
 
-async def _parse_product_payload(
+def _parse_product_payload(
     request: Request,
     model: Type[ModelT]
 ) -> tuple[ModelT, UploadFile | None]:
@@ -43,7 +44,7 @@ async def _parse_product_payload(
     image_upload: UploadFile | None = None
 
     if "multipart/form-data" in content_type:
-        form = await request.form()
+        form = anyio.from_thread.run(request.form)
         image_upload = (
             form.get("image")
             or form.get("new_image")
@@ -69,7 +70,7 @@ async def _parse_product_payload(
                 payload_data[key] = value
     else:
         try:
-            payload_data = await request.json()
+            payload_data = anyio.from_thread.run(request.json)
         except ValueError as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -93,7 +94,7 @@ async def _parse_product_payload(
     return product_model, image_upload
 
 
-async def _read_image_upload(
+def _read_image_upload(
     upload: UploadFile | None
 ) -> tuple[bytes | None, str | None]:
     """
@@ -108,8 +109,8 @@ async def _read_image_upload(
             detail="Invalid file type. Allowed types: JPG, PNG, GIF, WebP"
         )
 
-    content = await upload.read()
-    await upload.close()
+    content = anyio.from_thread.run(upload.read)
+    anyio.from_thread.run(upload.close)
 
     if len(content) > MAX_IMAGE_SIZE:
         raise HTTPException(
@@ -124,7 +125,7 @@ router = APIRouter(prefix="/products", tags=["products"])
 
 
 @router.get("/", response_model=List[ProductResponse])
-async def get_products(
+def get_products(
     store_id: Optional[UUID] = Query(None, description="Filter by store ID"),
     search: Optional[str] = Query(None, description="Search term for name, SKU, barcode, or category"),
     category: Optional[str] = Query(None, description="Filter by category"),
@@ -145,7 +146,7 @@ async def get_products(
         if not store_id and user.store_id:
             store_id = user.store_id
 
-        products = await product_service.get_products_by_store(
+        products = product_service.get_products_by_store(
             store_id=store_id,
             tenant_id=tenant_id,
             skip=skip,
@@ -165,7 +166,7 @@ async def get_products(
 
 
 @router.get("/{product_id}", response_model=ProductResponse)
-async def get_product(
+def get_product(
     product_id: UUID,
     product_service: ProductService = Depends(get_product_service),
     user_tenant: tuple[User, UUID] = Depends(get_current_user_with_tenant)
@@ -176,7 +177,7 @@ async def get_product(
     try:
         user, tenant_id = user_tenant
 
-        product = await product_service.get_product(product_id, tenant_id)
+        product = product_service.get_product(product_id, tenant_id)
         if not product:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -195,7 +196,7 @@ async def get_product(
 
 
 @router.get("/sku/{sku}", response_model=ProductResponse)
-async def get_product_by_sku(
+def get_product_by_sku(
     sku: str,
     store_id: Optional[UUID] = Query(None, description="Store ID for multi-store filtering"),
     product_service: ProductService = Depends(get_product_service),
@@ -211,7 +212,7 @@ async def get_product_by_sku(
         if not store_id and user.store_id:
             store_id = user.store_id
 
-        product = await product_service.get_product_by_sku(sku, tenant_id, store_id)
+        product = product_service.get_product_by_sku(sku, tenant_id, store_id)
         if not product:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -230,7 +231,7 @@ async def get_product_by_sku(
 
 
 @router.get("/barcode/{barcode}", response_model=ProductResponse)
-async def get_product_by_barcode(
+def get_product_by_barcode(
     barcode: str,
     store_id: Optional[UUID] = Query(None, description="Store ID for multi-store filtering"),
     product_service: ProductService = Depends(get_product_service),
@@ -246,7 +247,7 @@ async def get_product_by_barcode(
         if not store_id and user.store_id:
             store_id = user.store_id
 
-        product = await product_service.get_product_by_barcode(barcode, tenant_id, store_id)
+        product = product_service.get_product_by_barcode(barcode, tenant_id, store_id)
         if not product:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -265,7 +266,7 @@ async def get_product_by_barcode(
 
 
 @router.post("/", response_model=ProductResponse)
-async def create_product(
+def create_product(
     request: Request,
     product_service: ProductService = Depends(get_product_service),
     user_tenant: tuple[User, UUID] = Depends(get_current_user_with_tenant),
@@ -278,7 +279,7 @@ async def create_product(
     """
     try:
         user, tenant_id = user_tenant
-        product_data, image_upload = await _parse_product_payload(request, ProductCreate)
+    product_data, image_upload = _parse_product_payload(request, ProductCreate)
 
         # Validate store_id - users can only create products in their assigned store
         if not product_data.store_id:
@@ -290,9 +291,9 @@ async def create_product(
                     detail="Store ID is required"
                 )
 
-        image_content, image_filename = await _read_image_upload(image_upload)
+    image_content, image_filename = _read_image_upload(image_upload)
 
-        product = await product_service.create_product_with_image(
+        product = product_service.create_product_with_image(
             product_data=product_data,
             tenant_id=tenant_id,
             image_content=image_content,
@@ -316,7 +317,7 @@ async def create_product(
 
 
 @router.put("/{product_id}", response_model=ProductResponse)
-async def update_product(
+def update_product(
     product_id: UUID,
     request: Request,
     product_service: ProductService = Depends(get_product_service),
@@ -331,10 +332,10 @@ async def update_product(
     try:
         user, tenant_id = user_tenant
 
-        product_data, image_upload = await _parse_product_payload(request, ProductUpdate)
-        new_image_content, new_image_filename = await _read_image_upload(image_upload)
+    product_data, image_upload = _parse_product_payload(request, ProductUpdate)
+    new_image_content, new_image_filename = _read_image_upload(image_upload)
 
-        product = await product_service.update_product_with_image(
+        product = product_service.update_product_with_image(
             product_id=product_id,
             tenant_id=tenant_id,
             update_data=product_data,
@@ -364,7 +365,7 @@ async def update_product(
 
 
 @router.delete("/{product_id}")
-async def delete_product(
+def delete_product(
     product_id: UUID,
     product_service: ProductService = Depends(get_product_service),
     user_tenant: tuple[User, UUID] = Depends(get_current_user_with_tenant),
@@ -377,7 +378,7 @@ async def delete_product(
     try:
         user, tenant_id = user_tenant
 
-        success = await product_service.delete_product(product_id, tenant_id)
+        success = product_service.delete_product(product_id, tenant_id)
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -396,7 +397,7 @@ async def delete_product(
 
 
 @router.get("/categories/", response_model=List[str])
-async def get_categories(
+def get_categories(
     store_id: Optional[UUID] = Query(None, description="Filter by store ID"),
     product_service: ProductService = Depends(get_product_service),
     user_tenant: tuple[User, UUID] = Depends(get_current_user_with_tenant)
@@ -411,7 +412,7 @@ async def get_categories(
         if not store_id and user.store_id:
             store_id = user.store_id
 
-        categories = await product_service.get_categories(tenant_id, store_id)
+        categories = product_service.get_categories(tenant_id, store_id)
         return categories
 
     except Exception as e:
@@ -422,7 +423,7 @@ async def get_categories(
 
 
 @router.get("/search/{search_term}", response_model=List[ProductResponse])
-async def search_products(
+def search_products(
     search_term: str,
     store_id: Optional[UUID] = Query(None, description="Filter by store ID"),
     skip: int = Query(0, ge=0, description="Number of records to skip"),
@@ -440,7 +441,7 @@ async def search_products(
         if not store_id and user.store_id:
             store_id = user.store_id
 
-        products = await product_service.search_products(
+        products = product_service.search_products(
             search_term=search_term,
             tenant_id=tenant_id,
             store_id=store_id,
@@ -458,7 +459,7 @@ async def search_products(
 
 
 @router.get("/stock/low", response_model=List[ProductResponse])
-async def get_low_stock_products(
+def get_low_stock_products(
     threshold: int = Query(5, ge=0, description="Low stock threshold"),
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of records to return"),
@@ -471,7 +472,7 @@ async def get_low_stock_products(
     try:
         user, tenant_id = user_tenant
 
-        products = await product_service.get_low_stock_products(
+        products = product_service.get_low_stock_products(
             tenant_id=tenant_id,
             threshold=threshold,
             skip=skip,
@@ -488,7 +489,7 @@ async def get_low_stock_products(
 
 
 @router.patch("/{product_id}/stock")
-async def update_product_stock(
+def update_product_stock(
     product_id: UUID,
     new_stock: int = Query(..., ge=0, description="New stock quantity"),
     product_service: ProductService = Depends(get_product_service),
@@ -502,7 +503,7 @@ async def update_product_stock(
     try:
         user, tenant_id = user_tenant
 
-        product = await product_service.update_stock(product_id, tenant_id, new_stock)
+        product = product_service.update_stock(product_id, tenant_id, new_stock)
 
         return {
             "message": "Stock updated successfully",

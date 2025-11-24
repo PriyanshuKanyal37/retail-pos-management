@@ -15,7 +15,7 @@ router = APIRouter(prefix="/public", tags=["public"])
 
 
 @router.get("/storage-test")
-async def test_storage(
+def test_storage(
     storage_service: SupabaseStorageService = Depends(get_storage_service)
 ):
     """Test storage service without authentication"""
@@ -31,7 +31,7 @@ async def test_storage(
 
 
 @router.get("/health")
-async def health_check():
+def health_check():
     """Health check endpoint"""
     return {
         "status": "healthy",
@@ -46,7 +46,7 @@ async def health_check():
 
 
 @router.get("/info")
-async def api_info():
+def api_info():
     """API information without authentication"""
     return {
         "api_name": "FA POS Backend API",
@@ -73,7 +73,7 @@ async def api_info():
 
 
 @router.post("/test-image-upload")
-async def test_image_upload(
+def test_image_upload(
     image: UploadFile = File(..., description="Test image file"),
     storage_service: SupabaseStorageService = Depends(get_storage_service)
 ):
@@ -98,14 +98,14 @@ async def test_image_upload(
             )
 
         # Read file content
-        image_content = await image.read()
+        image_content = image.file.read()
 
         # Create test file path (using fixed test tenant and product)
         test_tenant_id = UUID("00000000-0000-0000-0000-000000000001")
         test_product_id = UUID("00000000-0000-0000-0000-000000000002")
 
         # Upload to products bucket in test location
-        file_url = await storage_service.upload_product_image(
+        file_url = storage_service.upload_product_image(
             image_content=image_content,
             product_id=test_product_id,
             tenant_id=test_tenant_id,
@@ -130,7 +130,7 @@ async def test_image_upload(
 
 
 @router.post("/test-pdf-upload")
-async def test_pdf_upload(
+def test_pdf_upload(
     pdf: UploadFile = File(..., description="Test PDF file"),
     storage_service: SupabaseStorageService = Depends(get_storage_service)
 ):
@@ -154,14 +154,14 @@ async def test_pdf_upload(
             )
 
         # Read file content
-        pdf_content = await pdf.read()
+        pdf_content = pdf.file.read()
 
         # Create test file path (using fixed test tenant and sale)
         test_tenant_id = UUID("00000000-0000-0000-0000-000000000001")
         test_sale_id = UUID("00000000-0000-0000-0000-000000000002")
 
         # Upload to invoices bucket in test location
-        file_url = await storage_service.upload_invoice_pdf(
+        file_url = storage_service.upload_invoice_pdf(
             pdf_content=pdf_content,
             sale_id=test_sale_id,
             tenant_id=test_tenant_id
@@ -185,7 +185,7 @@ async def test_pdf_upload(
 
 
 @router.get("/test-file-list")
-async def list_test_files(
+def list_test_files(
     storage_service: SupabaseStorageService = Depends(get_storage_service)
 ):
     """List test files in storage buckets"""

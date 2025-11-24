@@ -29,7 +29,7 @@ router = APIRouter(prefix="/sales", tags=["sales"])
 
 
 @router.get("/", response_model=List[dict])
-async def get_sales(
+def get_sales(
     store_id: Optional[UUID] = Query(None, description="Filter by store ID"),
     date_from: Optional[date] = Query(None, description="Filter by start date (YYYY-MM-DD)"),
     date_to: Optional[date] = Query(None, description="Filter by end date (YYYY-MM-DD)"),
@@ -51,7 +51,7 @@ async def get_sales(
         if not store_id and user.store_id:
             store_id = user.store_id
 
-        sales = await sales_service.get_sales_by_store(
+        sales =  sales_service.get_sales_by_store(
             store_id=store_id,
             tenant_id=tenant_id,
             skip=skip,
@@ -94,7 +94,7 @@ async def get_sales(
 
 
 @router.get("/next-invoice", response_model=dict)
-async def get_next_invoice_number(
+def get_next_invoice_number(
     sales_service: SalesService = Depends(get_sales_service),
     user_tenant: tuple[User, UUID] = Depends(get_current_user_with_tenant)
 ):
@@ -103,7 +103,7 @@ async def get_next_invoice_number(
     """
     try:
         user, tenant_id = user_tenant
-        invoice_number = await sales_service.get_next_invoice_number(tenant_id)
+        invoice_number =  sales_service.get_next_invoice_number(tenant_id)
         return {"invoice_number": invoice_number}
     except Exception as e:
         raise HTTPException(
@@ -113,7 +113,7 @@ async def get_next_invoice_number(
 
 
 @router.get("/{sale_id}", response_model=dict)
-async def get_sale_details(
+def get_sale_details(
     sale_id: UUID,
     sales_service: SalesService = Depends(get_sales_service),
     user_tenant: tuple[User, UUID] = Depends(get_current_user_with_tenant)
@@ -124,7 +124,7 @@ async def get_sale_details(
     try:
         user, tenant_id = user_tenant
 
-        sale_details = await sales_service.get_sale_with_items(sale_id, tenant_id)
+        sale_details =  sales_service.get_sale_with_items(sale_id, tenant_id)
         if not sale_details:
             raise HTTPException(
                 status_code=http_status.HTTP_404_NOT_FOUND,
@@ -176,7 +176,7 @@ async def get_sale_details(
 
 
 @router.post("/", response_model=SaleResponse)
-async def create_sale(
+def create_sale(
     sale_data: SaleCreate,
     sales_service: SalesService = Depends(get_sales_service),
     user_tenant: tuple[User, UUID] = Depends(get_current_user_with_tenant)
@@ -209,7 +209,7 @@ async def create_sale(
         )
 
         # Create sale with items (invoice upload handled by dedicated endpoint)
-        sale = await sales_service.create_sale_with_items(
+        sale =  sales_service.create_sale_with_items(
             sale_data=sale_data,
             items_data=sale_data.items,
             tenant_id=tenant_id,
@@ -225,7 +225,7 @@ async def create_sale(
 
 
 @router.put("/{sale_id}", response_model=dict)
-async def update_sale(
+def update_sale(
     sale_id: UUID,
     sale_data: SaleUpdate,
     sales_service: SalesService = Depends(get_sales_service),
@@ -239,7 +239,7 @@ async def update_sale(
     try:
         user, tenant_id = user_tenant
 
-        sale = await sales_service.update_sale(sale_id, tenant_id, sale_data)
+        sale =  sales_service.update_sale(sale_id, tenant_id, sale_data)
 
         return {
             "message": "Sale updated successfully",
@@ -272,7 +272,7 @@ async def update_sale(
 
 
 @router.patch("/{sale_id}/payment-status")
-async def update_payment_status(
+def update_payment_status(
     sale_id: UUID,
     payment_status: str = Query(..., description="New payment status (pending/paid/partial/refunded)"),
     sales_service: SalesService = Depends(get_sales_service),
@@ -286,7 +286,7 @@ async def update_payment_status(
     try:
         user, tenant_id = user_tenant
 
-        sale = await sales_service.update_payment_status(sale_id, tenant_id, payment_status)
+        sale =  sales_service.update_payment_status(sale_id, tenant_id, payment_status)
 
         return {
             "message": "Payment status updated successfully",
@@ -314,7 +314,7 @@ async def update_payment_status(
 
 
 @router.get("/{sale_id}/invoice")
-async def download_invoice_pdf(
+def download_invoice_pdf(
     sale_id: UUID,
     sales_service: SalesService = Depends(get_sales_service),
     user_tenant: tuple[User, UUID] = Depends(get_current_user_with_tenant)
@@ -325,7 +325,7 @@ async def download_invoice_pdf(
     try:
         user, tenant_id = user_tenant
 
-        pdf_content = await sales_service.download_invoice_pdf(sale_id, tenant_id)
+        pdf_content =  sales_service.download_invoice_pdf(sale_id, tenant_id)
         if not pdf_content:
             raise HTTPException(
                 status_code=http_status.HTTP_404_NOT_FOUND,
@@ -348,7 +348,7 @@ async def download_invoice_pdf(
 
 
 @router.delete("/{sale_id}")
-async def delete_sale(
+def delete_sale(
     sale_id: UUID,
     sales_service: SalesService = Depends(get_sales_service),
     user_tenant: tuple[User, UUID] = Depends(get_current_user_with_tenant),
@@ -361,7 +361,7 @@ async def delete_sale(
     try:
         user, tenant_id = user_tenant
 
-        success = await sales_service.delete_sale(sale_id, tenant_id)
+        success =  sales_service.delete_sale(sale_id, tenant_id)
         if not success:
             raise HTTPException(
                 status_code=http_status.HTTP_404_NOT_FOUND,
@@ -380,7 +380,7 @@ async def delete_sale(
 
 
 @router.get("/statistics/summary")
-async def get_sales_statistics(
+def get_sales_statistics(
     store_id: Optional[UUID] = Query(None, description="Filter by store ID"),
     days: int = Query(30, ge=1, le=365, description="Number of days for statistics"),
     sales_service: SalesService = Depends(get_sales_service),
@@ -396,7 +396,7 @@ async def get_sales_statistics(
         if not store_id and user.store_id:
             store_id = user.store_id
 
-        statistics = await sales_service.get_sales_statistics(
+        statistics =  sales_service.get_sales_statistics(
             tenant_id=tenant_id,
             store_id=store_id,
             days=days

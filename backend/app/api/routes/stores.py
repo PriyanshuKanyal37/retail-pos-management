@@ -2,7 +2,7 @@ from typing import Sequence
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.api.deps import (
     get_current_user,
@@ -26,9 +26,9 @@ router = APIRouter(prefix="/stores", tags=["stores"])
 
 
 @router.get("/", response_model=list[Store])
-async def get_stores(
+def get_stores(
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_db_session),
+    session: Session = Depends(get_db_session),
     tenant_id: UUID = Depends(get_tenant_id),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
@@ -42,7 +42,7 @@ async def get_stores(
     """
     if current_user.role == "super_admin" or current_user.role == "manager":
         # Super admin and manager can see all stores
-        stores = await crud_store.get_multi(
+        stores = crud_store.get_multi(
             session,
             skip=skip,
             limit=limit,
@@ -54,7 +54,7 @@ async def get_stores(
         if not current_user.store_id:
             return []
 
-        store = await crud_store.get(
+        store = crud_store.get(
             session,
             id=current_user.store_id,
             tenant_id=tenant_id,
@@ -65,15 +65,15 @@ async def get_stores(
 
 
 @router.get("/active", response_model=list[Store])
-async def get_active_stores(
+def get_active_stores(
     current_user: User = Depends(require_manager),
-    session: AsyncSession = Depends(get_db_session),
+    session: Session = Depends(get_db_session),
     tenant_id: UUID = Depends(get_tenant_id),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
 ) -> list[Store]:
     """Get active stores (manager and super admin only)"""
-    stores = await crud_store.get_active_stores(
+    stores = crud_store.get_active_stores(
         session,
         tenant_id=tenant_id,
         skip=skip,
@@ -84,16 +84,16 @@ async def get_active_stores(
 
 
 @router.get("/search", response_model=list[Store])
-async def search_stores(
+def search_stores(
     search_term: str = Query(..., min_length=1),
     current_user: User = Depends(require_manager),
-    session: AsyncSession = Depends(get_db_session),
+    session: Session = Depends(get_db_session),
     tenant_id: UUID = Depends(get_tenant_id),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
 ) -> list[Store]:
     """Search stores by name or address (manager and super admin only)"""
-    stores = await crud_store.search_stores(
+    stores = crud_store.search_stores(
         session,
         search_term=search_term,
         tenant_id=tenant_id,
@@ -105,10 +105,10 @@ async def search_stores(
 
 
 @router.get("/{store_id}", response_model=Store)
-async def get_store(
+def get_store(
     store_id: UUID,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_db_session),
+    session: Session = Depends(get_db_session),
     tenant_id: UUID = Depends(get_tenant_id),
 ) -> Store:
     """
@@ -124,7 +124,7 @@ async def get_store(
             detail="You can only access your assigned store"
         )
 
-    store = await crud_store.get(
+    store = crud_store.get(
         session,
         id=store_id,
         tenant_id=tenant_id,
@@ -140,22 +140,22 @@ async def get_store(
 
 
 @router.get("/{store_id}/stats", response_model=StoreStats)
-async def get_store_statistics(
+def get_store_statistics(
     store_id: UUID,
     current_user: User = Depends(require_manager),
-    session: AsyncSession = Depends(get_db_session),
+    session: Session = Depends(get_db_session),
     tenant_id: UUID = Depends(get_tenant_id),
 ) -> dict:
     """Get store statistics (manager and super admin only)"""
     # Verify store exists
-    store = await crud_store.get(session, id=store_id, tenant_id=tenant_id)
+    store =  crud_store.get(session, id=store_id, tenant_id=tenant_id)
     if not store:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Store not found"
         )
 
-    stats = await crud_store.get_store_statistics(
+    stats =  crud_store.get_store_statistics(
         session,
         store_id=store_id,
         tenant_id=tenant_id,
@@ -165,15 +165,15 @@ async def get_store_statistics(
 
 
 @router.post("/", response_model=Store, status_code=status.HTTP_201_CREATED)
-async def create_store(
+def create_store(
     store_data: StoreCreate,
     current_user: User = Depends(require_super_admin),
-    session: AsyncSession = Depends(get_db_session),
+    session: Session = Depends(get_db_session),
     tenant_id: UUID = Depends(get_tenant_id),
 ) -> Store:
     """Create a new store (super admin only)"""
     # Check if store name already exists in tenant
-    existing_store = await crud_store.get_by_name(
+    existing_store =  crud_store.get_by_name(
         session,
         name=store_data.name,
         tenant_id=tenant_id,
@@ -189,7 +189,7 @@ async def create_store(
     store_dict["tenant_id"] = tenant_id
 
     try:
-        store = await crud_store.create(
+        store =  crud_store.create(
             session,
             obj_in=store_dict,
             tenant_id=tenant_id,
@@ -203,15 +203,15 @@ async def create_store(
 
 
 @router.patch("/{store_id}", response_model=Store)
-async def update_store(
+def update_store(
     store_id: UUID,
     store_data: StoreUpdate,
     current_user: User = Depends(require_super_admin),
-    session: AsyncSession = Depends(get_db_session),
+    session: Session = Depends(get_db_session),
     tenant_id: UUID = Depends(get_tenant_id),
 ) -> Store:
     """Update store (super admin only)"""
-    store = await crud_store.get(session, id=store_id, tenant_id=tenant_id)
+    store =  crud_store.get(session, id=store_id, tenant_id=tenant_id)
     if not store:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -220,7 +220,7 @@ async def update_store(
 
     # Check if name conflict (if name is being updated)
     if store_data.name and store_data.name != store.name:
-        existing_store = await crud_store.get_by_name(
+        existing_store =  crud_store.get_by_name(
             session,
             name=store_data.name,
             tenant_id=tenant_id,
@@ -232,7 +232,7 @@ async def update_store(
             )
 
     try:
-        updated_store = await crud_store.update(
+        updated_store =  crud_store.update(
             session,
             db_obj=store,
             obj_in=store_data,
@@ -248,11 +248,11 @@ async def update_store(
 
 
 @router.patch("/{store_id}/status")
-async def update_store_status(
+def update_store_status(
     store_id: UUID,
     status: str,
     current_user: User = Depends(require_super_admin),
-    session: AsyncSession = Depends(get_db_session),
+    session: Session = Depends(get_db_session),
     tenant_id: UUID = Depends(get_tenant_id),
 ) -> dict:
     """Update store status (super admin only)"""
@@ -262,7 +262,7 @@ async def update_store_status(
             detail="Invalid status. Must be one of: active, inactive, suspended"
         )
 
-    store = await crud_store.update_status(
+    store =  crud_store.update_status(
         session,
         store_id=store_id,
         status=status,
@@ -279,15 +279,15 @@ async def update_store_status(
 
 
 @router.delete("/{store_id}")
-async def delete_store(
+def delete_store(
     store_id: UUID,
     current_user: User = Depends(require_super_admin),
-    session: AsyncSession = Depends(get_db_session),
+    session: Session = Depends(get_db_session),
     tenant_id: UUID = Depends(get_tenant_id),
 ) -> dict:
     """Delete a store (super admin only)"""
     # TODO: Add checks for existing data before deletion
-    store = await crud_store.remove(
+    store =  crud_store.remove(
         session,
         id=store_id,
         tenant_id=tenant_id,
