@@ -3,7 +3,7 @@ from uuid import UUID
 
 from sqlalchemy import and_, or_, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.models.product import Product
 from app.schemas.product import ProductCreate, ProductUpdate
@@ -29,10 +29,10 @@ class ProductNotFoundError(ProductError):
 class TenantProductService(TenantAwareService):
     """Tenant-aware product service that automatically filters by tenant_id"""
 
-    def __init__(self, session: AsyncSession, tenant_id: UUID):
+    def __init__(self, session: Session, tenant_id: UUID):
         super().__init__(session, tenant_id, Product)
 
-    async def get_by_sku(self, sku: str) -> Optional[Product]:
+    def get_by_sku(self, sku: str) -> Optional[Product]:
         """Get a product by SKU within the current tenant."""
         statement = select(Product).where(
             and_(
@@ -40,10 +40,10 @@ class TenantProductService(TenantAwareService):
                 Product.sku == sku
             )
         )
-        result = await self.session.execute(statement)
+        result = self.session.execute(statement)
         return result.scalar_one_or_none()
 
-    async def get_by_barcode(self, barcode: str) -> Optional[Product]:
+    def get_by_barcode(self, barcode: str) -> Optional[Product]:
         """Get a product by barcode within the current tenant."""
         statement = select(Product).where(
             and_(
@@ -51,10 +51,10 @@ class TenantProductService(TenantAwareService):
                 Product.barcode == barcode
             )
         )
-        result = await self.session.execute(statement)
+        result = self.session.execute(statement)
         return result.scalar_one_or_none()
 
-    async def get_low_stock_products(self, threshold: int = 5) -> Sequence[Product]:
+    def get_low_stock_products(self, threshold: int = 5) -> Sequence[Product]:
         """Get products with stock below threshold within the current tenant."""
         statement = select(Product).where(
             and_(
@@ -64,28 +64,28 @@ class TenantProductService(TenantAwareService):
             )
         ).order_by(Product.stock.asc())
 
-        result = await self.session.execute(statement)
+        result = self.session.execute(statement)
         return result.scalars().all()
 
-    async def create(self, data: dict) -> Product:
+    def create(self, data: dict) -> Product:
         """Create a new product with tenant validation."""
         # Check for duplicate SKU within tenant
-        existing = await self.get_by_sku(data.get('sku', ''))
+        existing = self.get_by_sku(data.get('sku', ''))
         if existing:
             raise DuplicateSKUError(f"Product with SKU '{data.get('sku')}' already exists in this tenant")
 
         # Check for duplicate barcode within tenant if provided
         barcode = data.get('barcode')
         if barcode:
-            existing = await self.get_by_barcode(barcode)
+            existing = self.get_by_barcode(barcode)
             if existing:
                 raise DuplicateBarcodeError(f"Product with barcode '{barcode}' already exists in this tenant")
 
         # Use parent class create method which automatically sets tenant_id
         try:
-            return await super().create(data)
+            return super().create(data)
         except IntegrityError as exc:
-            await self.session.rollback()
+            self.session.rollback()
             error_str = str(exc).lower()
             if "sku" in error_str:
                 raise DuplicateSKUError(f"Product with SKU '{data.get('sku')}' already exists in this tenant") from exc
@@ -93,23 +93,23 @@ class TenantProductService(TenantAwareService):
                 raise DuplicateBarcodeError(f"Product with barcode '{barcode}' already exists in this tenant") from exc
             raise ProductError("Failed to create product") from exc
 
-    async def update(self, product_id: UUID, data: dict) -> Optional[Product]:
+    def update(self, product_id: UUID, data: dict) -> Optional[Product]:
         """Update a product within the current tenant."""
-        product = await self.get_by_id(product_id)
+        product = self.get_by_id(product_id)
         if not product:
             return None
 
         # Check for duplicate SKU if updating
         new_sku = data.get('sku')
         if new_sku and new_sku != product.sku:
-            existing = await self.get_by_sku(new_sku)
+            existing = self.get_by_sku(new_sku)
             if existing:
                 raise DuplicateSKUError(f"Product with SKU '{new_sku}' already exists in this tenant")
 
         # Check for duplicate barcode if updating
         new_barcode = data.get('barcode')
         if new_barcode and new_barcode != product.barcode:
-            existing = await self.get_by_barcode(new_barcode)
+            existing = self.get_by_barcode(new_barcode)
             if existing:
                 raise DuplicateBarcodeError(f"Product with barcode '{new_barcode}' already exists in this tenant")
 
@@ -118,9 +118,9 @@ class TenantProductService(TenantAwareService):
             del data['tenant_id']
 
         try:
-            return await super().update(product_id, data)
+            return super().update(product_id, data)
         except IntegrityError as exc:
-            await self.session.rollback()
+            self.session.rollback()
             error_str = str(exc).lower()
             if "sku" in error_str:
                 raise DuplicateSKUError(f"Product with SKU '{new_sku}' already exists in this tenant") from exc
@@ -128,14 +128,14 @@ class TenantProductService(TenantAwareService):
                 raise DuplicateBarcodeError(f"Product with barcode '{new_barcode}' already exists in this tenant") from exc
             raise ProductError("Failed to update product") from exc
 
-    async def soft_delete(self, product_id: UUID) -> bool:
+    def soft_delete(self, product_id: UUID) -> bool:
         """Soft delete a product by setting status to 'inactive'."""
-        product = await self.get_by_id(product_id)
+        product = self.get_by_id(product_id)
         if not product:
             return False
 
         product.status = "inactive"
-        await self.session.commit()
+        self.session.commit()
         return True
 
     def build_filtered_query(

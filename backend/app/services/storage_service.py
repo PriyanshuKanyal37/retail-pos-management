@@ -18,7 +18,7 @@ class SupabaseStorageService:
         """Initialize storage service with Supabase client"""
         self.supabase = supabase_client or get_supabase_client()
 
-    async def upload_invoice_pdf(
+    def upload_invoice_pdf(
         self,
         pdf_content: bytes,
         sale_id: uuid.UUID,
@@ -68,7 +68,7 @@ class SupabaseStorageService:
             logger.error(error_msg)
             raise Exception(error_msg)
 
-    async def upload_product_image(
+    def upload_product_image(
         self,
         image_content: bytes,
         product_id: uuid.UUID,
@@ -131,7 +131,7 @@ class SupabaseStorageService:
             logger.error(error_msg)
             raise Exception(error_msg)
 
-    async def upload_store_logo(
+    def upload_store_logo(
         self,
         logo_content: bytes,
         store_id: uuid.UUID,
@@ -181,7 +181,7 @@ class SupabaseStorageService:
             logger.error(error_msg)
             raise Exception(error_msg)
 
-    async def delete_file(self, bucket_name: str, file_path: str) -> bool:
+    def delete_file(self, bucket_name: str, file_path: str) -> bool:
         """
         Delete file from Supabase Storage
 
@@ -209,7 +209,7 @@ class SupabaseStorageService:
             logger.error(f"Error deleting file {file_path}: {e}")
             return False
 
-    async def download_file(self, bucket_name: str, file_path: str) -> Optional[bytes]:
+    def download_file(self, bucket_name: str, file_path: str) -> Optional[bytes]:
         """
         Download file from Supabase Storage
 
@@ -251,7 +251,7 @@ class SupabaseStorageService:
             logger.error(f"Error extracting file path from URL {url}: {e}")
             return None
 
-    async def update_product_image(
+    def update_product_image(
         self,
         product_id: uuid.UUID,
         tenant_id: uuid.UUID,
@@ -277,7 +277,7 @@ class SupabaseStorageService:
         """
         try:
             # Upload new image first
-            new_image_url = await self.upload_product_image(
+            new_image_url = self.upload_product_image(
                 image_content=new_image_content,
                 product_id=product_id,
                 tenant_id=tenant_id,
@@ -288,7 +288,7 @@ class SupabaseStorageService:
             if old_image_url:
                 old_file_path = self.extract_file_path_from_url(old_image_url)
                 if old_file_path:
-                    await self.delete_file("products", old_file_path)
+                    self.delete_file("products", old_file_path)
 
             return new_image_url
 
@@ -297,7 +297,7 @@ class SupabaseStorageService:
             logger.error(error_msg)
             raise Exception(error_msg)
 
-    async def list_files_in_bucket(self, bucket_name: str, prefix: str = None) -> list:
+    def list_files_in_bucket(self, bucket_name: str, prefix: str = None) -> list:
         """
         List files in a bucket with optional prefix filtering
 

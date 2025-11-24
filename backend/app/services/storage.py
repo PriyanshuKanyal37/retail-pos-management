@@ -40,7 +40,7 @@ def generate_unique_filename(original_filename: str) -> str:
     return f"{unique_name}.{extension}" if extension else unique_name
 
 
-async def upload_file_to_bucket(
+def upload_file_to_bucket(
     file: BinaryIO,
     filename: str,
     bucket_name: str,
@@ -97,7 +97,7 @@ async def upload_file_to_bucket(
         raise UploadError(f"Failed to upload file to {bucket_name}: {str(exc)}") from exc
 
 
-async def delete_file_from_bucket(file_path: str, bucket_name: str) -> bool:
+def delete_file_from_bucket(file_path: str, bucket_name: str) -> bool:
     """
     Delete a file from a Supabase Storage bucket.
 
@@ -119,7 +119,7 @@ async def delete_file_from_bucket(file_path: str, bucket_name: str) -> bool:
         raise DeleteError(f"Failed to delete file from {bucket_name}: {str(exc)}") from exc
 
 
-async def get_signed_url(file_path: str, bucket_name: str, expires_in: int = 3600) -> str:
+def get_signed_url(file_path: str, bucket_name: str, expires_in: int = 3600) -> str:
     """
     Generate a signed URL for private file access.
 
@@ -170,24 +170,24 @@ def extract_file_path_from_url(url: str, bucket_name: str) -> str | None:
 # Convenience functions for specific buckets
 
 
-async def upload_product_image(file: BinaryIO, filename: str) -> str:
+def upload_product_image(file: BinaryIO, filename: str) -> str:
     """Upload a product image to the products bucket."""
-    return await upload_file_to_bucket(
+    return upload_file_to_bucket(
         file=file, filename=filename, bucket_name=settings.supabase_products_bucket
     )
 
 
-async def delete_product_image(image_url: str) -> bool:
+def delete_product_image(image_url: str) -> bool:
     """Delete a product image from the products bucket."""
     file_path = extract_file_path_from_url(image_url, settings.supabase_products_bucket)
     if not file_path:
         raise DeleteError("Invalid product image URL")
-    return await delete_file_from_bucket(file_path, settings.supabase_products_bucket)
+    return delete_file_from_bucket(file_path, settings.supabase_products_bucket)
 
 
-async def upload_invoice_pdf(file: BinaryIO, filename: str) -> str:
+def upload_invoice_pdf(file: BinaryIO, filename: str) -> str:
     """Upload an invoice PDF to the invoices bucket."""
-    public_url = await upload_file_to_bucket(
+    public_url = upload_file_to_bucket(
         file=file,
         filename=filename,
         bucket_name=settings.supabase_invoices_bucket,
@@ -197,20 +197,20 @@ async def upload_invoice_pdf(file: BinaryIO, filename: str) -> str:
     # Convert to file path and generate signed URL
     file_path = extract_file_path_from_url(public_url, settings.supabase_invoices_bucket)
     if file_path:
-        return await get_signed_url(file_path, settings.supabase_invoices_bucket, expires_in=86400)
+        return get_signed_url(file_path, settings.supabase_invoices_bucket, expires_in=86400)
     return public_url
 
 
-async def upload_branding_asset(file: BinaryIO, filename: str) -> str:
+def upload_branding_asset(file: BinaryIO, filename: str) -> str:
     """Upload a branding asset (logo, etc.) to the branding bucket."""
-    return await upload_file_to_bucket(
+    return upload_file_to_bucket(
         file=file, filename=filename, bucket_name=settings.supabase_branding_bucket
     )
 
 
-async def delete_branding_asset(asset_url: str) -> bool:
+def delete_branding_asset(asset_url: str) -> bool:
     """Delete a branding asset from the branding bucket."""
     file_path = extract_file_path_from_url(asset_url, settings.supabase_branding_bucket)
     if not file_path:
         raise DeleteError("Invalid branding asset URL")
-    return await delete_file_from_bucket(file_path, settings.supabase_branding_bucket)
+    return delete_file_from_bucket(file_path, settings.supabase_branding_bucket)
