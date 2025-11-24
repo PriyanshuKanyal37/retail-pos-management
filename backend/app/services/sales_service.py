@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from sqlalchemy import select, and_
 
 from app.crud.crud_sale import crud_sale
@@ -49,11 +49,11 @@ class SalesService:
     Uses SQLAlchemy for database operations and Supabase for file storage.
     """
 
-    def __init__(self, db: AsyncSession, storage_service: SupabaseStorageService):
+    def __init__(self, db: Session, storage_service: SupabaseStorageService):
         self.db = db
         self.storage = storage_service
 
-    async def get_sale(
+    def get_sale(
         self,
         sale_id: UUID,
         tenant_id: UUID
@@ -68,9 +68,9 @@ class SalesService:
         Returns:
             Sale instance or None if not found
         """
-        return await crud_sale.get(db=self.db, id=sale_id)
+        return crud_sale.get(db=self.db, id=sale_id)
 
-    async def get_sale_with_items(
+    def get_sale_with_items(
         self,
         sale_id: UUID,
         tenant_id: UUID
@@ -86,13 +86,13 @@ class SalesService:
             Dictionary containing sale, items, and invoice info
         """
         # Get sale
-        sale = await self.get_sale(sale_id, tenant_id)
+        sale = self.get_sale(sale_id, tenant_id)
         if not sale:
             return None
 
         # Get sale items
         items_query = select(SaleItem).where(SaleItem.sale_id == sale_id)
-        items_result = await self.db.execute(items_query)
+        items_result = self.db.execute(items_query)
         items = items_result.scalars().all()
 
         return {
@@ -108,7 +108,7 @@ class SalesService:
             "change_amount": float(sale.change_amount) if sale.change_amount else 0.0
         }
 
-    async def create_sale_with_invoice(
+    def create_sale_with_invoice(
         self,
         sale_data: SaleCreate,
         tenant_id: UUID,
@@ -131,7 +131,7 @@ class SalesService:
         """
         try:
             # Always generate a fresh invoice number for this sale
-            next_invoice = await self.get_next_invoice_number(tenant_id)
+            next_invoice = self.get_next_invoice_number(tenant_id)
             sale_data = sale_data.model_copy(update={"invoice_no": next_invoice})
 
             # Prepare sale data (exclude fields not stored on Sale table)
@@ -146,12 +146,12 @@ class SalesService:
             sale_data_dict["tenant_id"] = tenant_id
 
             # Create sale
-            sale = await crud_sale.create(db=self.db, obj_in=sale_data_dict)
+            sale = crud_sale.create(db=self.db, obj_in=sale_data_dict)
 
             # Upload invoice PDF if provided
             if pdf_content and sale_data.store_id:
                 try:
-                    invoice_url = await self.storage.upload_invoice_pdf(
+                    invoice_url = self.storage.upload_invoice_pdf(
                         pdf_content=pdf_content,
                         sale_id=sale.id,
                         tenant_id=tenant_id
@@ -159,8 +159,8 @@ class SalesService:
 
                     # Update sale with invoice URL
                     sale.invoice_pdf_url = invoice_url
-                    await self.db.commit()
-                    await self.db.refresh(sale)
+                    self.db.commit()
+                    self.db.refresh(sale)
 
                     logger.info(f"Successfully uploaded invoice for sale {sale.id}")
 
@@ -172,11 +172,11 @@ class SalesService:
             return sale
 
         except Exception as e:
-            await self.db.rollback()
+            self.db.rollback()
             logger.error(f"Failed to create sale: {e}")
             raise SalesServiceError(f"Failed to create sale: {str(e)}")
 
-    async def create_sale_with_items(
+    def create_sale_with_items(
         self,
         sale_data: SaleCreate,
         items_data: List[SaleItemCreate],
@@ -197,7 +197,7 @@ class SalesService:
         """
         try:
             # Create sale
-            sale = await self.create_sale_with_invoice(sale_data, tenant_id, pdf_content)
+            sale = self.create_sale_with_invoice(sale_data, tenant_id, pdf_content)
 
             # Create sale items
             for item_data in items_data:
@@ -206,19 +206,19 @@ class SalesService:
                 item_data_dict["tenant_id"] = tenant_id
                 item_data_dict["store_id"] = sale.store_id
 
-                await crud_sale_item.create(db=self.db, obj_in=item_data_dict)
+                crud_sale_item.create(db=self.db, obj_in=item_data_dict)
 
-            await self.db.commit()
-            await self.db.refresh(sale, attribute_names=["items"])
+            self.db.commit()
+            self.db.refresh(sale, attribute_names=["items"])
 
             return sale
 
         except Exception as e:
-            await self.db.rollback()
+            self.db.rollback()
             logger.error(f"Failed to create sale with items: {e}")
             raise SalesServiceError(f"Failed to create sale with items: {str(e)}")
 
-    async def update_sale(
+    def update_sale(
         self,
         sale_id: UUID,
         tenant_id: UUID,
@@ -238,7 +238,7 @@ class SalesService:
         Raises:
             SaleNotFoundError: If sale not found
         """
-        sale = await self.get_sale(sale_id, tenant_id)
+        sale = self.get_sale(sale_id, tenant_id)
         if not sale:
             raise SaleNotFoundError(f"Sale {sale_id} not found")
 
@@ -249,7 +249,7 @@ class SalesService:
                 raise InvalidSaleStatusError(f"Invalid status: {update_data.status}")
 
         # Update sale
-        updated_sale = await crud_sale.update(
+        updated_sale = crud_sale.update(
             db=self.db,
             db_obj=sale,
             obj_in=update_data.model_dump(exclude_unset=True)
@@ -257,7 +257,7 @@ class SalesService:
 
         return updated_sale
 
-    async def update_payment_status(
+    def update_payment_status(
         self,
         sale_id: UUID,
         tenant_id: UUID,
@@ -282,13 +282,13 @@ class SalesService:
         if payment_status not in valid_statuses:
             raise InvalidSaleStatusError(f"Invalid payment status: {payment_status}")
 
-        return await self.update_sale(
+        return self.update_sale(
             sale_id=sale_id,
             tenant_id=tenant_id,
             update_data=SaleUpdate(payment_status=payment_status)
         )
 
-    async def get_sales_by_store(
+    def get_sales_by_store(
         self,
         store_id: UUID,
         tenant_id: UUID,
@@ -325,7 +325,7 @@ class SalesService:
         # Note: Date filtering would need to be implemented in the CRUD layer
         # For now, we'll get all records and the caller can filter by date
 
-        return await crud_sale.get_multi(
+        return crud_sale.get_multi(
             db=self.db,
             skip=skip,
             limit=limit,
@@ -333,7 +333,7 @@ class SalesService:
             filters=filters
         )
 
-    async def get_sales_by_date_range(
+    def get_sales_by_date_range(
         self,
         tenant_id: UUID,
         store_id: Optional[UUID] = None,
@@ -361,7 +361,7 @@ class SalesService:
         if store_id:
             filters["store_id"] = store_id
 
-        return await crud_sale.get_multi(
+        return crud_sale.get_multi(
             db=self.db,
             skip=skip,
             limit=limit,
@@ -369,7 +369,7 @@ class SalesService:
             filters=filters
         )
 
-    async def download_invoice_pdf(
+    def download_invoice_pdf(
         self,
         sale_id: UUID,
         tenant_id: UUID
@@ -384,7 +384,7 @@ class SalesService:
         Returns:
             PDF content as bytes, or None if not found
         """
-        sale = await self.get_sale(sale_id, tenant_id)
+        sale = self.get_sale(sale_id, tenant_id)
         if not sale or not sale.invoice_pdf_url:
             return None
 
@@ -396,12 +396,12 @@ class SalesService:
 
         # Download file
         try:
-            return await self.storage.download_file("invoices", file_path)
+            return self.storage.download_file("invoices", file_path)
         except Exception as e:
             logger.error(f"Failed to download invoice for sale {sale_id}: {e}")
             return None
 
-    async def delete_sale(
+    def delete_sale(
         self,
         sale_id: UUID,
         tenant_id: UUID
@@ -416,7 +416,7 @@ class SalesService:
         Returns:
             True if deletion successful, False otherwise
         """
-        sale = await self.get_sale(sale_id, tenant_id)
+        sale = self.get_sale(sale_id, tenant_id)
         if not sale:
             return False
 
@@ -426,29 +426,29 @@ class SalesService:
                 try:
                     file_path = self.storage.extract_file_path_from_url(sale.invoice_pdf_url)
                     if file_path:
-                        await self.storage.delete_file("invoices", file_path)
+                        self.storage.delete_file("invoices", file_path)
                 except Exception as e:
                     logger.error(f"Failed to delete invoice for sale {sale_id}: {e}")
                     # Continue with sale deletion even if file deletion fails
 
             # Delete sale items first (due to foreign key constraints)
             items_query = select(SaleItem).where(SaleItem.sale_id == sale_id)
-            items_result = await self.db.execute(items_query)
+            items_result = self.db.execute(items_query)
             items = items_result.scalars().all()
 
             for item in items:
-                await crud_sale_item.remove(db=self.db, id=item.id)
+                crud_sale_item.remove(db=self.db, id=item.id)
 
             # Delete sale
-            await crud_sale.remove(db=self.db, id=sale_id)
+            crud_sale.remove(db=self.db, id=sale_id)
             return True
 
         except Exception as e:
-            await self.db.rollback()
+            self.db.rollback()
             logger.error(f"Failed to delete sale {sale_id}: {e}")
             return False
 
-    async def get_sales_statistics(
+    def get_sales_statistics(
         self,
         tenant_id: UUID,
         store_id: Optional[UUID] = None,
@@ -473,7 +473,7 @@ class SalesService:
             filters["store_id"] = store_id
 
         # Get recent sales (placeholder - would need proper date filtering)
-        recent_sales = await crud_sale.get_multi(
+        recent_sales = crud_sale.get_multi(
             db=self.db,
             skip=0,
             limit=1000,
@@ -496,7 +496,7 @@ class SalesService:
             "payment_rate": (paid_sales / total_sales * 100) if total_sales > 0 else 0
         }
 
-    async def get_next_invoice_number(
+    def get_next_invoice_number(
         self,
         tenant_id: UUID
     ) -> str:
@@ -509,7 +509,7 @@ class SalesService:
             random_digits = secrets.randbelow(10_000)
             invoice_no = f"{date_prefix}-{random_digits:04d}"
 
-            existing_sale = await crud_sale.get_by_invoice_no(
+            existing_sale = crud_sale.get_by_invoice_no(
                 db=self.db,
                 invoice_no=invoice_no,
                 tenant_id=tenant_id

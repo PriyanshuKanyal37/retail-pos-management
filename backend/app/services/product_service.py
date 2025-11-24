@@ -7,7 +7,7 @@ import logging
 from typing import List, Optional, Sequence
 from uuid import UUID
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, or_
 
 from app.crud.crud_product import crud_product
@@ -49,11 +49,11 @@ class ProductService:
     Uses SQLAlchemy for database operations and Supabase for file storage.
     """
 
-    def __init__(self, db: AsyncSession, storage_service: SupabaseStorageService):
+    def __init__(self, db: Session, storage_service: SupabaseStorageService):
         self.db = db
         self.storage = storage_service
 
-    async def get_product(
+    def get_product(
         self,
         product_id: UUID,
         tenant_id: UUID
@@ -68,9 +68,9 @@ class ProductService:
         Returns:
             Product instance or None if not found
         """
-        return await crud_product.get(db=self.db, id=product_id)
+        return crud_product.get(db=self.db, id=product_id)
 
-    async def get_product_by_sku(
+    def get_product_by_sku(
         self,
         sku: str,
         tenant_id: UUID,
@@ -87,14 +87,14 @@ class ProductService:
         Returns:
             Product instance or None if not found
         """
-        return await crud_product.get_by_sku(
+        return crud_product.get_by_sku(
             db=self.db,
             sku=sku,
             tenant_id=tenant_id,
             store_id=store_id
         )
 
-    async def get_product_by_barcode(
+    def get_product_by_barcode(
         self,
         barcode: str,
         tenant_id: UUID,
@@ -111,14 +111,14 @@ class ProductService:
         Returns:
             Product instance or None if not found
         """
-        return await crud_product.get_by_barcode(
+        return crud_product.get_by_barcode(
             db=self.db,
             barcode=barcode,
             tenant_id=tenant_id,
             store_id=store_id
         )
 
-    async def create_product_with_image(
+    def create_product_with_image(
         self,
         product_data: ProductCreate,
         tenant_id: UUID,
@@ -143,7 +143,7 @@ class ProductService:
             ProductStorageError: If image upload fails
         """
         # Check for duplicate SKU
-        if await crud_product.sku_exists(
+        if crud_product.sku_exists(
             db=self.db,
             sku=product_data.sku,
             tenant_id=tenant_id,
@@ -152,7 +152,7 @@ class ProductService:
             raise DuplicateSKUError(f"Product with SKU '{product_data.sku}' already exists")
 
         # Check for duplicate barcode if provided
-        if product_data.barcode and await crud_product.barcode_exists(
+        if product_data.barcode and crud_product.barcode_exists(
             db=self.db,
             barcode=product_data.barcode,
             tenant_id=tenant_id,
@@ -164,12 +164,12 @@ class ProductService:
         product_data_dict = product_data.model_dump()
         product_data_dict["tenant_id"] = tenant_id
 
-        product = await crud_product.create(db=self.db, obj_in=product_data_dict)
+        product = crud_product.create(db=self.db, obj_in=product_data_dict)
 
         # Upload image if provided
         if image_content and image_filename and product_data.store_id:
             try:
-                image_url = await self.storage.upload_product_image(
+                image_url = self.storage.upload_product_image(
                     image_content=image_content,
                     product_id=product.id,
                     tenant_id=tenant_id,
@@ -177,20 +177,20 @@ class ProductService:
                 )
 
                 product.img_url = image_url
-                await self.db.commit()
-                await self.db.refresh(product)
+                self.db.commit()
+                self.db.refresh(product)
 
                 logger.info(f"Successfully uploaded image for product {product.id}")
 
             except Exception as e:
                 # Product is still valid without image, but log the error
                 logger.error(f"Failed to upload product image for {product.id}: {e}")
-                await self.db.rollback()
+                self.db.rollback()
                 # Don't raise - the product was created successfully
 
         return product
 
-    async def update_product_with_image(
+    def update_product_with_image(
         self,
         product_id: UUID,
         tenant_id: UUID,
@@ -217,13 +217,13 @@ class ProductService:
             DuplicateBarcodeError: If new barcode already exists
         """
         # Get existing product
-        product = await self.get_product(product_id, tenant_id)
+        product = self.get_product(product_id, tenant_id)
         if not product:
             raise ProductNotFoundError(f"Product {product_id} not found")
 
         # Check for duplicate SKU if updating
         if update_data.sku and update_data.sku != product.sku:
-            if await crud_product.sku_exists(
+            if crud_product.sku_exists(
                 db=self.db,
                 sku=update_data.sku,
                 tenant_id=tenant_id,
@@ -234,7 +234,7 @@ class ProductService:
 
         # Check for duplicate barcode if updating
         if update_data.barcode and update_data.barcode != product.barcode:
-            if await crud_product.barcode_exists(
+            if crud_product.barcode_exists(
                 db=self.db,
                 barcode=update_data.barcode,
                 tenant_id=tenant_id,
@@ -246,7 +246,7 @@ class ProductService:
         # Update product image if new image provided
         if new_image_content and new_image_filename and product.store_id:
             try:
-                new_image_url = await self.storage.update_product_image(
+                new_image_url = self.storage.update_product_image(
                     product_id=product_id,
                     tenant_id=tenant_id,
                     old_image_url=product.img_url,
@@ -265,7 +265,7 @@ class ProductService:
             update_data_dict = update_data.model_dump(exclude_unset=True)
 
         # Update product
-        updated_product = await crud_product.update(
+        updated_product = crud_product.update(
             db=self.db,
             db_obj=product,
             obj_in=update_data_dict
@@ -273,7 +273,7 @@ class ProductService:
 
         return updated_product
 
-    async def get_products_by_store(
+    def get_products_by_store(
         self,
         store_id: UUID,
         tenant_id: UUID,
@@ -299,7 +299,7 @@ class ProductService:
             List of product instances
         """
         if search:
-            return await crud_product.search_products(
+            return crud_product.search_products(
                 db=self.db,
                 search_term=search,
                 tenant_id=tenant_id,
@@ -308,7 +308,7 @@ class ProductService:
                 limit=limit
             )
         elif category:
-            return await crud_product.get_by_category(
+            return crud_product.get_by_category(
                 db=self.db,
                 category=category,
                 tenant_id=tenant_id,
@@ -317,7 +317,7 @@ class ProductService:
                 limit=limit
             )
         else:
-            return await crud_product.get_products_by_store(
+            return crud_product.get_products_by_store(
                 db=self.db,
                 store_id=store_id,
                 tenant_id=tenant_id,
@@ -326,7 +326,7 @@ class ProductService:
                 status=status
             )
 
-    async def search_products(
+    def search_products(
         self,
         search_term: str,
         tenant_id: UUID,
@@ -347,7 +347,7 @@ class ProductService:
         Returns:
             List of matching product instances
         """
-        return await crud_product.search_products(
+        return crud_product.search_products(
             db=self.db,
             search_term=search_term,
             tenant_id=tenant_id,
@@ -356,7 +356,7 @@ class ProductService:
             limit=limit
         )
 
-    async def get_categories(
+    def get_categories(
         self,
         tenant_id: UUID,
         store_id: Optional[UUID] = None
@@ -371,13 +371,13 @@ class ProductService:
         Returns:
             List of unique category names
         """
-        return await crud_product.get_categories(
+        return crud_product.get_categories(
             db=self.db,
             tenant_id=tenant_id,
             store_id=store_id
         )
 
-    async def get_low_stock_products(
+    def get_low_stock_products(
         self,
         tenant_id: UUID,
         threshold: int = 5,
@@ -396,7 +396,7 @@ class ProductService:
         Returns:
             List of low stock product instances
         """
-        return await crud_product.get_low_stock_products(
+        return crud_product.get_low_stock_products(
             db=self.db,
             tenant_id=tenant_id,
             threshold=threshold,
@@ -404,7 +404,7 @@ class ProductService:
             limit=limit
         )
 
-    async def update_stock(
+    def update_stock(
         self,
         product_id: UUID,
         tenant_id: UUID,
@@ -424,7 +424,7 @@ class ProductService:
         Raises:
             ProductNotFoundError: If product not found
         """
-        product = await crud_product.update_stock(
+        product = crud_product.update_stock(
             db=self.db,
             product_id=product_id,
             new_stock=new_stock,
@@ -436,7 +436,7 @@ class ProductService:
 
         return product
 
-    async def adjust_stock(
+    def adjust_stock(
         self,
         product_id: UUID,
         tenant_id: UUID,
@@ -456,7 +456,7 @@ class ProductService:
         Raises:
             ProductNotFoundError: If product not found
         """
-        product = await crud_product.adjust_stock(
+        product = crud_product.adjust_stock(
             db=self.db,
             product_id=product_id,
             adjustment=adjustment,
@@ -468,7 +468,7 @@ class ProductService:
 
         return product
 
-    async def delete_product(
+    def delete_product(
         self,
         product_id: UUID,
         tenant_id: UUID
@@ -483,7 +483,7 @@ class ProductService:
         Returns:
             True if deletion successful, False otherwise
         """
-        product = await self.get_product(product_id, tenant_id)
+        product = self.get_product(product_id, tenant_id)
         if not product:
             return False
 
@@ -492,16 +492,16 @@ class ProductService:
             try:
                 file_path = self.storage.extract_file_path_from_url(product.img_url)
                 if file_path:
-                    await self.storage.delete_file("products", file_path)
+                    self.storage.delete_file("products", file_path)
             except Exception as e:
                 logger.error(f"Failed to delete product image for {product_id}: {e}")
                 # Continue with product deletion even if image deletion fails
 
         # Delete product from database
-        await crud_product.remove(db=self.db, id=product_id)
+        crud_product.remove(db=self.db, id=product_id)
         return True
 
-    async def get_product_statistics(
+    def get_product_statistics(
         self,
         tenant_id: UUID
     ) -> dict:
@@ -514,4 +514,4 @@ class ProductService:
         Returns:
             Dictionary with product statistics
         """
-        return await crud_product.get_product_statistics(db=self.db, tenant_id=tenant_id)
+        return crud_product.get_product_statistics(db=self.db, tenant_id=tenant_id)

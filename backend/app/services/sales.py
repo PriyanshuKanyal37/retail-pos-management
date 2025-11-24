@@ -7,8 +7,7 @@ from uuid import UUID
 
 from sqlalchemy import Select, func, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.product import Product
 from app.models.sale import Sale
@@ -41,7 +40,7 @@ class DuplicateInvoiceError(SaleError):
 
 
 
-async def generate_next_invoice_number(session: AsyncSession, *, tenant_id: UUID | None = None) -> str:
+def generate_next_invoice_number(session: Session, *, tenant_id: UUID | None = None) -> str:
     """Generate the next invoice number in INV-YYYY-XXXX-RRRRR format.
 
     Format: INV-2025-0001-12345 (sequential + 5-digit random suffix)
@@ -58,7 +57,7 @@ async def generate_next_invoice_number(session: AsyncSession, *, tenant_id: UUID
         .limit(1)
     )
     # NOTE: Do NOT scope by tenant to avoid collisions with a global unique constraint
-    result = await session.execute(stmt)
+    result = session.execute(stmt)
     latest_invoice = result.scalar_one_or_none()
 
     if latest_invoice:
@@ -102,8 +101,8 @@ def _apply_sale_filters(
     return statement
 
 
-async def list_sales(
-    session: AsyncSession,
+def list_sales(
+    session: Session,
     *,
     tenant_id: UUID,
     customer_id: UUID | None = None,
@@ -118,41 +117,41 @@ async def list_sales(
         .order_by(Sale.created_at.desc())
     )
     statement = _apply_sale_filters(statement, customer_id, cashier_id, start_date, end_date)
-    result = await session.execute(statement)
+    result = session.execute(statement)
     return result.scalars().all()
 
 
-async def get_sale(session: AsyncSession, sale_id: UUID, *, tenant_id: UUID) -> Sale | None:
+def get_sale(session: Session, sale_id: UUID, *, tenant_id: UUID) -> Sale | None:
     statement = (
         select(Sale)
         .options(selectinload(Sale.items))
         .where(and_(Sale.id == sale_id, Sale.tenant_id == tenant_id))
     )
-    result = await session.execute(statement)
+    result = session.execute(statement)
     return result.scalar_one_or_none()
 
 
-async def create_sale(
-    session: AsyncSession,
+def create_sale(
+    session: Session,
     payload: SaleCreate,
     *,
     tenant_id: UUID,
     requesting_user: User,
 ) -> Sale:
     # Ensure invoice number is unique (pre-check to avoid IntegrityError under common cases)
-    existing_invoice = await session.execute(
+    existing_invoice = session.execute(
         select(Sale.id).where(Sale.invoice_no == payload.invoice_no)
     )
     if existing_invoice.scalar_one_or_none() is not None:
         # Fallback to next available global invoice number
-        payload.invoice_no = await generate_next_invoice_number(session)
+        payload.invoice_no = generate_next_invoice_number(session)
     product_ids = [item.product_id for item in payload.items]
     if not product_ids:
         raise SaleError("Sale must include at least one item")
 
     # ATOMIC STOCK CHECKING AND DEDUCTION
     # Lock products for update to prevent race conditions
-    products_result = await session.execute(
+    products_result = session.execute(
         select(Product)
         .where(Product.id.in_(product_ids))
         .where(Product.tenant_id == tenant_id)
@@ -173,7 +172,7 @@ async def create_sale(
     for product_id, qty in requested_quantity.items():
         product = products[product_id]
         if product.stock < qty:
-            await session.rollback()
+            session.rollback()
             raise InsufficientStockError(product_id, product.stock, qty)
 
         # Immediately deduct stock to prevent overselling
@@ -201,7 +200,7 @@ async def create_sale(
     session.add(sale)
 
     # Flush to get the sale.id before creating sale items
-    await session.flush()
+    session.flush()
 
     # Create sale items (stock already deducted above)
     sale_items = []
@@ -216,9 +215,9 @@ async def create_sale(
         sale_items.append(sale_item)
         session.add(sale_item)
 
-    await session.commit()
+    session.commit()
 
-    result = await session.execute(
+    result = session.execute(
         select(Sale)
         .options(selectinload(Sale.items))
         .where(Sale.id == sale.id)
@@ -226,8 +225,8 @@ async def create_sale(
     return result.scalar_one()
 
 
-async def sales_summary(
-    session: AsyncSession,
+def sales_summary(
+    session: Session,
     *,
     tenant_id: UUID,
     customer_id: UUID | None = None,
@@ -247,9 +246,7 @@ async def sales_summary(
     )
     if filters is not None:
         aggregate_stmt = aggregate_stmt.where(filters)
-    total_sales, total_revenue, total_discount = (
-        await session.execute(aggregate_stmt)
-    ).one()
+    total_sales, total_revenue, total_discount = session.execute(aggregate_stmt).one()
 
     payment_stmt = select(
         Sale.payment_method,
@@ -258,7 +255,7 @@ async def sales_summary(
     if filters is not None:
         payment_stmt = payment_stmt.where(filters)
     payment_stmt = payment_stmt.group_by(Sale.payment_method)
-    payment_rows = await session.execute(payment_stmt)
+    payment_rows = session.execute(payment_stmt)
     payment_breakdown = [
         {"method": method, "total": Decimal(total)}
         for method, total in payment_rows.all()
@@ -281,7 +278,7 @@ async def sales_summary(
         .order_by(func.coalesce(func.sum(SaleItem.quantity), 0).desc())
         .limit(5)
     )
-    top_rows = await session.execute(top_products_stmt)
+    top_rows = session.execute(top_products_stmt)
     top_products = [
         {
             "product_id": product_id,
