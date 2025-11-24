@@ -184,22 +184,13 @@ export const api = {
       formData.append('username', email);
       formData.append('password', password);
 
-      const response = await apiRequest('/auth/login', {
+      return apiRequest('/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: formData,
       });
-
-      // Extract user and token from response
-      return {
-        user: response.user,
-        token: response.access_token,
-        token_type: response.token_type,
-        tenant_id: response.tenant_id,
-        tenant_name: response.tenant_name
-      };
     },
     // Verify current token
     verify: () => apiRequest('/auth/verify'),
