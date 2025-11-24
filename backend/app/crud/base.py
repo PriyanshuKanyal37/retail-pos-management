@@ -7,7 +7,6 @@ from uuid import UUID
 
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 from sqlalchemy import select, update, delete, func, and_
 from sqlalchemy.exc import SQLAlchemyError
@@ -33,9 +32,9 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         """
         self.model = model
 
-    async def get(
+    def get(
         self,
-        db: AsyncSession,
+        db: Session,
         id: Any,
         *,
         tenant_id: Optional[UUID] = None
@@ -56,12 +55,12 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         if tenant_id and hasattr(self.model, 'tenant_id'):
             query = query.where(self.model.tenant_id == tenant_id)
 
-        result = await db.execute(query)
+        result = db.execute(query)
         return result.scalar_one_or_none()
 
-    async def get_multi(
+    def get_multi(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         skip: int = 0,
         limit: int = 100,
@@ -111,12 +110,12 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
         query = query.offset(skip).limit(limit)
 
-        result = await db.execute(query)
+        result = db.execute(query)
         return result.scalars().all()
 
-    async def count(
+    def count(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         tenant_id: Optional[UUID] = None,
         filters: Optional[Dict[str, Any]] = None
@@ -147,12 +146,12 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                     else:
                         query = query.where(getattr(self.model, key) == value)
 
-        result = await db.execute(query)
+        result = db.execute(query)
         return result.scalar()
 
-    async def create(
+    def create(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         obj_in: CreateSchemaType,
         tenant_id: Optional[UUID] = None
@@ -180,16 +179,16 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
             db_obj = self.model(**obj_in_data)
             db.add(db_obj)
-            await db.commit()
-            await db.refresh(db_obj)
+            db.commit()
+            db.refresh(db_obj)
             return db_obj
         except SQLAlchemyError as e:
-            await db.rollback()
+            db.rollback()
             raise e
 
-    async def update(
+    def update(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         db_obj: ModelType,
         obj_in: Union[UpdateSchemaType, Dict[str, Any]]
@@ -221,16 +220,16 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                     setattr(db_obj, field, update_data[field])
 
             db.add(db_obj)
-            await db.commit()
-            await db.refresh(db_obj)
+            db.commit()
+            db.refresh(db_obj)
             return db_obj
         except SQLAlchemyError as e:
-            await db.rollback()
+            db.rollback()
             raise e
 
-    async def remove(
+    def remove(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         id: int,
         tenant_id: Optional[UUID] = None
@@ -250,18 +249,18 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             SQLAlchemyError: If database operation fails
         """
         try:
-            obj = await self.get(db, id=id, tenant_id=tenant_id)
+            obj = self.get(db, id=id, tenant_id=tenant_id)
             if obj:
-                await db.delete(obj)
-                await db.commit()
+                db.delete(obj)
+                db.commit()
             return obj
         except SQLAlchemyError as e:
-            await db.rollback()
+            db.rollback()
             raise e
 
-    async def exists(
+    def exists(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         filters: Dict[str, Any],
         tenant_id: Optional[UUID] = None
@@ -288,13 +287,13 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         if tenant_id and hasattr(self.model, 'tenant_id'):
             query = query.where(self.model.tenant_id == tenant_id)
 
-        result = await db.execute(query)
+        result = db.execute(query)
         count = result.scalar()
         return count > 0
 
-    async def get_by_field(
+    def get_by_field(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         field_name: str,
         field_value: Any,
@@ -320,12 +319,12 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         if tenant_id and hasattr(self.model, 'tenant_id'):
             query = query.where(self.model.tenant_id == tenant_id)
 
-        result = await db.execute(query)
+        result = db.execute(query)
         return result.scalar_one_or_none()
 
-    async def bulk_create(
+    def bulk_create(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         objs_in: List[CreateSchemaType],
         tenant_id: Optional[UUID] = None
@@ -357,13 +356,13 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                 db_objs.append(db_obj)
 
             db.add_all(db_objs)
-            await db.commit()
+            db.commit()
 
             # Refresh all objects to get their IDs and timestamps
             for db_obj in db_objs:
-                await db.refresh(db_obj)
+                db.refresh(db_obj)
 
             return db_objs
         except SQLAlchemyError as e:
-            await db.rollback()
+            db.rollback()
             raise e

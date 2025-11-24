@@ -6,7 +6,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from sqlalchemy import select, func, and_
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.crud.base import CRUDBase
 from app.models.product import Product
@@ -18,9 +18,9 @@ class CRUDProduct(CRUDBase[Product, ProductCreate, ProductUpdate]):
     CRUD operations for Product model with multi-tenant support.
     """
 
-    async def get_by_sku(
+    def get_by_sku(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         sku: str,
         tenant_id: UUID,
@@ -43,12 +43,12 @@ class CRUDProduct(CRUDBase[Product, ProductCreate, ProductUpdate]):
             conditions.append(Product.store_id == store_id)
 
         query = select(Product).where(and_(*conditions))
-        result = await db.execute(query)
+        result = db.execute(query)
         return result.scalar_one_or_none()
 
-    async def get_by_barcode(
+    def get_by_barcode(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         barcode: str,
         tenant_id: UUID,
@@ -71,12 +71,12 @@ class CRUDProduct(CRUDBase[Product, ProductCreate, ProductUpdate]):
             conditions.append(Product.store_id == store_id)
 
         query = select(Product).where(and_(*conditions))
-        result = await db.execute(query)
+        result = db.execute(query)
         return result.scalar_one_or_none()
 
-    async def sku_exists(
+    def sku_exists(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         sku: str,
         tenant_id: UUID,
@@ -105,13 +105,13 @@ class CRUDProduct(CRUDBase[Product, ProductCreate, ProductUpdate]):
         if exclude_product_id:
             query = query.where(Product.id != exclude_product_id)
 
-        result = await db.execute(query)
+        result = db.execute(query)
         count = result.scalar()
         return count > 0
 
-    async def barcode_exists(
+    def barcode_exists(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         barcode: str,
         tenant_id: UUID,
@@ -143,13 +143,13 @@ class CRUDProduct(CRUDBase[Product, ProductCreate, ProductUpdate]):
         if exclude_product_id:
             query = query.where(Product.id != exclude_product_id)
 
-        result = await db.execute(query)
+        result = db.execute(query)
         count = result.scalar()
         return count > 0
 
-    async def search_products(
+    def search_products(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         search_term: str,
         tenant_id: UUID,
@@ -184,12 +184,12 @@ class CRUDProduct(CRUDBase[Product, ProductCreate, ProductUpdate]):
 
         query = select(Product).where(and_(*conditions))
         query = query.offset(skip).limit(limit).order_by(Product.name)
-        result = await db.execute(query)
+        result = db.execute(query)
         return result.scalars().all()
 
-    async def get_by_category(
+    def get_by_category(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         category: str,
         tenant_id: UUID,
@@ -217,12 +217,12 @@ class CRUDProduct(CRUDBase[Product, ProductCreate, ProductUpdate]):
 
         query = select(Product).where(and_(*conditions))
         query = query.offset(skip).limit(limit).order_by(Product.name)
-        result = await db.execute(query)
+        result = db.execute(query)
         return result.scalars().all()
 
-    async def get_categories(
+    def get_categories(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         tenant_id: UUID,
         store_id: Optional[UUID] = None
@@ -244,13 +244,13 @@ class CRUDProduct(CRUDBase[Product, ProductCreate, ProductUpdate]):
 
         query = select(Product.category).where(and_(*conditions)).distinct()
 
-        result = await db.execute(query)
+        result = db.execute(query)
         categories = [row[0] for row in result if row[0]]
         return sorted(categories)
 
-    async def get_products_by_store(
+    def get_products_by_store(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         store_id: UUID,
         tenant_id: UUID,
@@ -278,12 +278,12 @@ class CRUDProduct(CRUDBase[Product, ProductCreate, ProductUpdate]):
 
         query = select(Product).where(and_(*conditions))
         query = query.offset(skip).limit(limit).order_by(Product.name)
-        result = await db.execute(query)
+        result = db.execute(query)
         return result.scalars().all()
 
-    async def get_low_stock_products(
+    def get_low_stock_products(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         tenant_id: UUID,
         threshold: Optional[int] = None,
@@ -316,12 +316,12 @@ class CRUDProduct(CRUDBase[Product, ProductCreate, ProductUpdate]):
         )
 
         query = query.offset(skip).limit(limit).order_by(Product.stock.asc())
-        result = await db.execute(query)
+        result = db.execute(query)
         return result.scalars().all()
 
-    async def get_out_of_stock_products(
+    def get_out_of_stock_products(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         tenant_id: UUID,
         skip: int = 0,
@@ -348,12 +348,12 @@ class CRUDProduct(CRUDBase[Product, ProductCreate, ProductUpdate]):
         )
 
         query = query.offset(skip).limit(limit).order_by(Product.name)
-        result = await db.execute(query)
+        result = db.execute(query)
         return result.scalars().all()
 
-    async def update_stock(
+    def update_stock(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         product_id: UUID,
         new_stock: int,
@@ -374,19 +374,19 @@ class CRUDProduct(CRUDBase[Product, ProductCreate, ProductUpdate]):
         query = select(Product).where(
             and_(Product.id == product_id, Product.tenant_id == tenant_id)
         )
-        result = await db.execute(query)
+        result = db.execute(query)
         product = result.scalar_one_or_none()
 
         if product:
             product.stock = new_stock
-            await db.commit()
-            await db.refresh(product)
+            db.commit()
+            db.refresh(product)
 
         return product
 
-    async def adjust_stock(
+    def adjust_stock(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         product_id: UUID,
         adjustment: int,
@@ -407,20 +407,20 @@ class CRUDProduct(CRUDBase[Product, ProductCreate, ProductUpdate]):
         query = select(Product).where(
             and_(Product.id == product_id, Product.tenant_id == tenant_id)
         )
-        result = await db.execute(query)
+        result = db.execute(query)
         product = result.scalar_one_or_none()
 
         if product:
             new_stock = max(0, product.stock + adjustment)  # Prevent negative stock
             product.stock = new_stock
-            await db.commit()
-            await db.refresh(product)
+            db.commit()
+            db.refresh(product)
 
         return product
 
-    async def get_product_statistics(
+    def get_product_statistics(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         tenant_id: UUID
     ) -> dict:
@@ -436,14 +436,14 @@ class CRUDProduct(CRUDBase[Product, ProductCreate, ProductUpdate]):
         """
         # Total products
         total_query = select(func.count(Product.id)).where(Product.tenant_id == tenant_id)
-        total_result = await db.execute(total_query)
+        total_result = db.execute(total_query)
         total_products = total_result.scalar() or 0
 
         # Active products
         active_query = select(func.count(Product.id)).where(
             and_(Product.tenant_id == tenant_id, Product.status == "active")
         )
-        active_result = await db.execute(active_query)
+        active_result = db.execute(active_query)
         active_products = active_result.scalar() or 0
 
         # Low stock products
@@ -454,7 +454,7 @@ class CRUDProduct(CRUDBase[Product, ProductCreate, ProductUpdate]):
                 Product.status == "active"
             )
         )
-        low_stock_result = await db.execute(low_stock_query)
+        low_stock_result = db.execute(low_stock_query)
         low_stock_products = low_stock_result.scalar() or 0
 
         # Out of stock products
@@ -465,21 +465,21 @@ class CRUDProduct(CRUDBase[Product, ProductCreate, ProductUpdate]):
                 Product.status == "active"
             )
         )
-        out_of_stock_result = await db.execute(out_of_stock_query)
+        out_of_stock_result = db.execute(out_of_stock_query)
         out_of_stock_products = out_of_stock_result.scalar() or 0
 
         # Total inventory value
         inventory_value_query = select(func.sum(Product.stock * Product.price)).where(
             Product.tenant_id == tenant_id
         )
-        inventory_value_result = await db.execute(inventory_value_query)
+        inventory_value_result = db.execute(inventory_value_query)
         total_inventory_value = float(inventory_value_result.scalar() or 0)
 
         # Categories count
         categories_query = select(func.count(func.distinct(Product.category))).where(
             and_(Product.tenant_id == tenant_id, Product.category.isnot(None))
         )
-        categories_result = await db.execute(categories_query)
+        categories_result = db.execute(categories_query)
         total_categories = categories_result.scalar() or 0
 
         return {

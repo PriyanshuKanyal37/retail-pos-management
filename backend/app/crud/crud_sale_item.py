@@ -6,7 +6,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from sqlalchemy import select, func, and_
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.crud.base import CRUDBase
 from app.models.sale_item import SaleItem
@@ -18,9 +18,9 @@ class CRUDSaleItem(CRUDBase[SaleItem, SaleItemCreate, SaleItemUpdate]):
     CRUD operations for SaleItem model with multi-tenant support.
     """
 
-    async def get_by_sale(
+    def get_by_sale(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         sale_id: UUID,
         tenant_id: UUID
@@ -40,12 +40,12 @@ class CRUDSaleItem(CRUDBase[SaleItem, SaleItemCreate, SaleItemUpdate]):
             and_(SaleItem.sale_id == sale_id, SaleItem.tenant_id == tenant_id)
         ).order_by(SaleItem.id)
 
-        result = await db.execute(query)
+        result = db.execute(query)
         return result.scalars().all()
 
-    async def get_by_product(
+    def get_by_product(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         product_id: UUID,
         tenant_id: UUID,
@@ -69,12 +69,12 @@ class CRUDSaleItem(CRUDBase[SaleItem, SaleItemCreate, SaleItemUpdate]):
             and_(SaleItem.product_id == product_id, SaleItem.tenant_id == tenant_id)
         ).offset(skip).limit(limit).order_by(SaleItem.id.desc())
 
-        result = await db.execute(query)
+        result = db.execute(query)
         return result.scalars().all()
 
-    async def create_batch(
+    def create_batch(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         items: List[SaleItemCreate],
         sale_id: UUID,
@@ -110,21 +110,21 @@ class CRUDSaleItem(CRUDBase[SaleItem, SaleItemCreate, SaleItemUpdate]):
                 db_items.append(db_item)
 
             db.add_all(db_items)
-            await db.commit()
+            db.commit()
 
             # Refresh all items to get their IDs
             for db_item in db_items:
-                await db.refresh(db_item)
+                db.refresh(db_item)
 
             return db_items
 
         except Exception as e:
-            await db.rollback()
+            db.rollback()
             raise e
 
-    async def get_product_sales_summary(
+    def get_product_sales_summary(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         product_id: UUID,
         tenant_id: UUID
@@ -157,7 +157,7 @@ class CRUDSaleItem(CRUDBase[SaleItem, SaleItemCreate, SaleItemUpdate]):
             )
         )
 
-        result = await db.execute(query)
+        result = db.execute(query)
         row = result.first()
 
         return {
@@ -167,9 +167,9 @@ class CRUDSaleItem(CRUDBase[SaleItem, SaleItemCreate, SaleItemUpdate]):
             "average_price": float(row.average_price or 0),
         }
 
-    async def get_top_selling_items(
+    def get_top_selling_items(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         tenant_id: UUID,
         limit: int = 10
@@ -208,7 +208,7 @@ class CRUDSaleItem(CRUDBase[SaleItem, SaleItemCreate, SaleItemUpdate]):
             func.sum(SaleItem.quantity).desc()
         ).limit(limit)
 
-        result = await db.execute(query)
+        result = db.execute(query)
         top_items = []
 
         for row in result:
@@ -221,9 +221,9 @@ class CRUDSaleItem(CRUDBase[SaleItem, SaleItemCreate, SaleItemUpdate]):
 
         return top_items
 
-    async def get_daily_item_sales(
+    def get_daily_item_sales(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         product_id: UUID,
         start_date,
@@ -263,7 +263,7 @@ class CRUDSaleItem(CRUDBase[SaleItem, SaleItemCreate, SaleItemUpdate]):
             func.date(Sale.created_at)
         ).order_by('date')
 
-        result = await db.execute(query)
+        result = db.execute(query)
         daily_data = []
 
         for row in result:
@@ -275,9 +275,9 @@ class CRUDSaleItem(CRUDBase[SaleItem, SaleItemCreate, SaleItemUpdate]):
 
         return daily_data
 
-    async def get_category_sales_summary(
+    def get_category_sales_summary(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         category: str,
         tenant_id: UUID
@@ -312,7 +312,7 @@ class CRUDSaleItem(CRUDBase[SaleItem, SaleItemCreate, SaleItemUpdate]):
             )
         )
 
-        result = await db.execute(query)
+        result = db.execute(query)
         row = result.first()
 
         return {

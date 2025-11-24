@@ -7,7 +7,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from sqlalchemy import select, func, and_, desc
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.crud.base import CRUDBase
 from app.models.sale import Sale
@@ -19,9 +19,9 @@ class CRUDSale(CRUDBase[Sale, SaleCreate, SaleUpdate]):
     CRUD operations for Sale model with multi-tenant support.
     """
 
-    async def get_by_invoice_no(
+    def get_by_invoice_no(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         invoice_no: str,
         tenant_id: UUID
@@ -40,12 +40,12 @@ class CRUDSale(CRUDBase[Sale, SaleCreate, SaleUpdate]):
         query = select(Sale).where(
             and_(Sale.invoice_no == invoice_no, Sale.tenant_id == tenant_id)
         )
-        result = await db.execute(query)
+        result = db.execute(query)
         return result.scalar_one_or_none()
 
-    async def create_with_items(
+    def create_with_items(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         obj_in: SaleCreate,
         tenant_id: UUID
@@ -87,29 +87,29 @@ class CRUDSale(CRUDBase[Sale, SaleCreate, SaleUpdate]):
 
                     # Update product stock
                     if item_data.product_id:
-                        product = await crud_product.get(
+                        product = crud_product.get(
                             db, id=item_data.product_id, tenant_id=tenant_id
                         )
                         if product:
                             new_stock = product.stock - item_data.quantity
                             if new_stock < 0:
                                 raise ValueError(f"Insufficient stock for product {product.name}")
-                            await crud_product.update_stock(
+                            crud_product.update_stock(
                                 db, product_id=item_data.product_id,
                                 new_stock=new_stock, tenant_id=tenant_id
                             )
 
-            await db.commit()
-            await db.refresh(db_sale)
+            db.commit()
+            db.refresh(db_sale)
             return db_sale
 
         except Exception as e:
-            await db.rollback()
+            db.rollback()
             raise e
 
-    async def get_by_customer(
+    def get_by_customer(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         customer_id: UUID,
         tenant_id: UUID,
@@ -134,12 +134,12 @@ class CRUDSale(CRUDBase[Sale, SaleCreate, SaleUpdate]):
         )
 
         query = query.offset(skip).limit(limit).order_by(desc(Sale.created_at))
-        result = await db.execute(query)
+        result = db.execute(query)
         return result.scalars().all()
 
-    async def get_by_cashier(
+    def get_by_cashier(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         cashier_id: UUID,
         tenant_id: UUID,
@@ -164,12 +164,12 @@ class CRUDSale(CRUDBase[Sale, SaleCreate, SaleUpdate]):
         )
 
         query = query.offset(skip).limit(limit).order_by(desc(Sale.created_at))
-        result = await db.execute(query)
+        result = db.execute(query)
         return result.scalars().all()
 
-    async def get_by_date_range(
+    def get_by_date_range(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         start_date: datetime,
         end_date: datetime,
@@ -200,12 +200,12 @@ class CRUDSale(CRUDBase[Sale, SaleCreate, SaleUpdate]):
         )
 
         query = query.offset(skip).limit(limit).order_by(desc(Sale.created_at))
-        result = await db.execute(query)
+        result = db.execute(query)
         return result.scalars().all()
 
-    async def get_today_sales(
+    def get_today_sales(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         tenant_id: UUID
     ) -> List[Sale]:
@@ -230,12 +230,12 @@ class CRUDSale(CRUDBase[Sale, SaleCreate, SaleUpdate]):
             )
         ).order_by(desc(Sale.created_at))
 
-        result = await db.execute(query)
+        result = db.execute(query)
         return result.scalars().all()
 
-    async def get_this_week_sales(
+    def get_this_week_sales(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         tenant_id: UUID
     ) -> List[Sale]:
@@ -260,12 +260,12 @@ class CRUDSale(CRUDBase[Sale, SaleCreate, SaleUpdate]):
             )
         ).order_by(desc(Sale.created_at))
 
-        result = await db.execute(query)
+        result = db.execute(query)
         return result.scalars().all()
 
-    async def get_this_month_sales(
+    def get_this_month_sales(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         tenant_id: UUID
     ) -> List[Sale]:
@@ -290,12 +290,12 @@ class CRUDSale(CRUDBase[Sale, SaleCreate, SaleUpdate]):
             )
         ).order_by(desc(Sale.created_at))
 
-        result = await db.execute(query)
+        result = db.execute(query)
         return result.scalars().all()
 
-    async def get_sales_summary(
+    def get_sales_summary(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         start_date: datetime,
         end_date: datetime,
@@ -321,7 +321,7 @@ class CRUDSale(CRUDBase[Sale, SaleCreate, SaleUpdate]):
                 Sale.created_at <= end_date
             )
         )
-        total_sales_result = await db.execute(total_sales_query)
+        total_sales_result = db.execute(total_sales_query)
         total_sales = total_sales_result.scalar() or 0
 
         # Total revenue
@@ -332,7 +332,7 @@ class CRUDSale(CRUDBase[Sale, SaleCreate, SaleUpdate]):
                 Sale.created_at <= end_date
             )
         )
-        total_revenue_result = await db.execute(total_revenue_query)
+        total_revenue_result = db.execute(total_revenue_query)
         total_revenue = float(total_revenue_result.scalar() or 0)
 
         # Total discount
@@ -343,7 +343,7 @@ class CRUDSale(CRUDBase[Sale, SaleCreate, SaleUpdate]):
                 Sale.created_at <= end_date
             )
         )
-        total_discount_result = await db.execute(total_discount_query)
+        total_discount_result = db.execute(total_discount_query)
         total_discount = float(total_discount_result.scalar() or 0)
 
         # Average order value
@@ -362,7 +362,7 @@ class CRUDSale(CRUDBase[Sale, SaleCreate, SaleUpdate]):
             )
         ).group_by(Sale.payment_method)
 
-        payment_breakdown_result = await db.execute(payment_breakdown_query)
+        payment_breakdown_result = db.execute(payment_breakdown_query)
         payment_breakdown = []
 
         for row in payment_breakdown_result:
@@ -380,9 +380,9 @@ class CRUDSale(CRUDBase[Sale, SaleCreate, SaleUpdate]):
             "payment_breakdown": payment_breakdown,
         }
 
-    async def get_top_products(
+    def get_top_products(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         start_date: datetime,
         end_date: datetime,
@@ -426,7 +426,7 @@ class CRUDSale(CRUDBase[Sale, SaleCreate, SaleUpdate]):
             desc(func.sum(SaleItem.quantity))
         ).limit(limit)
 
-        result = await db.execute(query)
+        result = db.execute(query)
         top_products = []
 
         for row in result:
@@ -439,9 +439,9 @@ class CRUDSale(CRUDBase[Sale, SaleCreate, SaleUpdate]):
 
         return top_products
 
-    async def get_daily_sales_data(
+    def get_daily_sales_data(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         start_date: datetime,
         end_date: datetime,
@@ -473,7 +473,7 @@ class CRUDSale(CRUDBase[Sale, SaleCreate, SaleUpdate]):
             func.date(Sale.created_at)
         ).order_by('date')
 
-        result = await db.execute(query)
+        result = db.execute(query)
         daily_data = []
 
         for row in result:
@@ -485,9 +485,9 @@ class CRUDSale(CRUDBase[Sale, SaleCreate, SaleUpdate]):
 
         return daily_data
 
-    async def get_sale_statistics(
+    def get_sale_statistics(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         tenant_id: UUID
     ) -> dict:
@@ -503,7 +503,7 @@ class CRUDSale(CRUDBase[Sale, SaleCreate, SaleUpdate]):
         """
         # Total sales
         total_query = select(func.count(Sale.id)).where(Sale.tenant_id == tenant_id)
-        total_result = await db.execute(total_query)
+        total_result = db.execute(total_query)
         total_sales = total_result.scalar() or 0
 
         # Today's sales
@@ -511,7 +511,7 @@ class CRUDSale(CRUDBase[Sale, SaleCreate, SaleUpdate]):
         today_sales_query = select(func.count(Sale.id)).where(
             and_(Sale.tenant_id == tenant_id, Sale.created_at >= today_start)
         )
-        today_sales_result = await db.execute(today_sales_query)
+        today_sales_result = db.execute(today_sales_query)
         today_sales = today_sales_result.scalar() or 0
 
         # This week's sales
@@ -521,7 +521,7 @@ class CRUDSale(CRUDBase[Sale, SaleCreate, SaleUpdate]):
         week_sales_query = select(func.count(Sale.id)).where(
             and_(Sale.tenant_id == tenant_id, Sale.created_at >= week_start_datetime)
         )
-        week_sales_result = await db.execute(week_sales_query)
+        week_sales_result = db.execute(week_sales_query)
         week_sales = week_sales_result.scalar() or 0
 
         # This month's sales
@@ -530,7 +530,7 @@ class CRUDSale(CRUDBase[Sale, SaleCreate, SaleUpdate]):
         month_sales_query = select(func.count(Sale.id)).where(
             and_(Sale.tenant_id == tenant_id, Sale.created_at >= month_start_datetime)
         )
-        month_sales_result = await db.execute(month_sales_query)
+        month_sales_result = db.execute(month_sales_query)
         month_sales = month_sales_result.scalar() or 0
 
         return {
@@ -540,9 +540,9 @@ class CRUDSale(CRUDBase[Sale, SaleCreate, SaleUpdate]):
             "month_sales": month_sales,
         }
 
-    async def get_sales_by_store(
+    def get_sales_by_store(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         store_id: UUID,
         tenant_id: UUID,
@@ -570,12 +570,12 @@ class CRUDSale(CRUDBase[Sale, SaleCreate, SaleUpdate]):
 
         query = select(Sale).where(and_(*conditions))
         query = query.offset(skip).limit(limit).order_by(Sale.created_at.desc())
-        result = await db.execute(query)
+        result = db.execute(query)
         return result.scalars().all()
 
-    async def get_store_sales_summary(
+    def get_store_sales_summary(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         store_id: UUID,
         tenant_id: UUID,
@@ -604,12 +604,12 @@ class CRUDSale(CRUDBase[Sale, SaleCreate, SaleUpdate]):
 
         # Total sales
         total_sales_query = select(func.count(Sale.id)).where(and_(*conditions))
-        total_sales_result = await db.execute(total_sales_query)
+        total_sales_result = db.execute(total_sales_query)
         total_sales = total_sales_result.scalar() or 0
 
         # Total revenue
         total_revenue_query = select(func.sum(Sale.total)).where(and_(*conditions))
-        total_revenue_result = await db.execute(total_revenue_query)
+        total_revenue_result = db.execute(total_revenue_query)
         total_revenue = float(total_revenue_result.scalar() or 0)
 
         return {
@@ -620,9 +620,9 @@ class CRUDSale(CRUDBase[Sale, SaleCreate, SaleUpdate]):
             "end_date": end_date.isoformat() if end_date else None,
         }
 
-    async def get_latest_invoice_for_tenant(
+    def get_latest_invoice_for_tenant(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         tenant_id: UUID
     ) -> Optional[Sale]:
@@ -635,7 +635,7 @@ class CRUDSale(CRUDBase[Sale, SaleCreate, SaleUpdate]):
             .order_by(desc(Sale.invoice_no))
             .limit(1)
         )
-        result = await db.execute(query)
+        result = db.execute(query)
         return result.scalar_one_or_none()
 
 
