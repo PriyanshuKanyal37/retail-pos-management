@@ -6,12 +6,6 @@ engine = create_async_engine(
     echo=settings.app_env == "development",
     pool_size=5,
     max_overflow=10,
-    # Disable asyncpg prepared statements because Railway's Postgres uses PgBouncer
-    # in transaction mode (prepared statements break in this mode).
-    connect_args={
-        "statement_cache_size": 0,
-        "prepared_statement_cache_size": 0,
-    },
 )
 
 AsyncSessionLocal = async_sessionmaker[AsyncSession](
