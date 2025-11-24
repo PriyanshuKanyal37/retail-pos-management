@@ -237,17 +237,6 @@ const Login = () => {
                 </p>
               </div>
 
-              {/* Demo Credentials */}
-              <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Demo Credentials:</p>
-                <div className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
-                  <div><strong>Super Admin:</strong> admin@company.com / password123</div>
-                  <div><strong>Manager 1:</strong> manager1@store.com / password123</div>
-                  <div><strong>Manager 2:</strong> manager2@store.com / password123</div>
-                  <div><strong>Cashier 1:</strong> cashier1@store.com / password123</div>
-                  <div><strong>Cashier 2:</strong> cashier2@store.com / password123</div>
-                </div>
-              </div>
             </form>
           )}
 
