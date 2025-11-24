@@ -4,11 +4,11 @@ uvicorn[standard]==0.24.0
 anyio==3.7.1
 starlette==0.27.0
 
-# Database
-sqlalchemy[asyncio]==2.0.23
-asyncpg==0.29.0
-psycopg[binary]==3.2.3
+# Database (SYNC)
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
 alembic==1.12.1
+
 # Authentication & Security
 passlib[bcrypt]==1.7.4
 python-jose[cryptography]==3.3.0
@@ -32,16 +32,10 @@ structlog==23.2.0
 slowapi==0.1.9
 limits==3.7.0
 
-# Background Tasks (Optional - remove if not using)
-# celery==5.3.4
-# redis==5.0.1
-
 # Development & Testing
 pytest==7.4.3
-pytest-asyncio==0.21.1
 pytest-cov==4.1.0
 factory-boy==3.3.0
-# Environment Management
 python-dotenv==1.0.0
 
 # Date/Time Utilities
