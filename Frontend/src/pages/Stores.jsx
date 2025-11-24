@@ -15,7 +15,8 @@ import useUIStore from '../stores/uiStore';
 
 const Stores = () => {
   const navigate = useNavigate();
-  const { isSuperAdmin } = useAuthStore();
+  const isSuperAdmin = useAuthStore((state) => state.isSuperAdmin);
+  const setActiveStore = useAuthStore((state) => state.setActiveStore);
   const { showAlert } = useUIStore();
 
   const [stores, setStores] = useState([]);
@@ -89,8 +90,7 @@ const Stores = () => {
 
   const handleEnterStore = (store) => {
     // Set active store for Super Admin context switching
-    const setActiveStore = useAuthStore((state) => state.setActiveStore);
-    setActiveStore(store.id);
+    setActiveStore(store.id, store.name);
     // Navigate to POS terminal in store context
     navigate('/pos');
     showAlert('success', `Entered store: ${store.name}`);

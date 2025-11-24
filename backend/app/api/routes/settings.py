@@ -9,6 +9,15 @@ from app.services.settings import get_settings, update_settings
 router = APIRouter(prefix="/settings", tags=["settings"])
 
 
+def _update_settings(
+    payload: SettingUpdate,
+    session: Session,
+    tenant_id: str,
+) -> SettingResponse:
+    updated = update_settings(session, payload, tenant_id)
+    return SettingResponse.model_validate(updated)
+
+
 @router.get("/", response_model=SettingResponse)
 def read_settings(
     _: User = Depends(get_current_user),
@@ -31,5 +40,17 @@ def patch_settings(
     session: Session = Depends(get_db_session),
     tenant_id: str = Depends(get_tenant_id),
 ) -> SettingResponse:
-    updated = update_settings(session, payload, tenant_id)
-    return SettingResponse.model_validate(updated)
+    return _update_settings(payload, session, tenant_id)
+
+
+@router.put("/", response_model=SettingResponse)
+def put_settings(
+    payload: SettingUpdate,
+    _: User = Depends(require_admin),
+    session: Session = Depends(get_db_session),
+    tenant_id: str = Depends(get_tenant_id),
+) -> SettingResponse:
+    """
+    Full update endpoint to support clients issuing PUT instead of PATCH.
+    """
+    return _update_settings(payload, session, tenant_id)

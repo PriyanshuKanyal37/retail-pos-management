@@ -14,6 +14,7 @@ const useAuthStore = create(
       tenant_id: null,
       tenant_name: null,
       activeStoreId: null,
+      activeStoreName: null,
       isAuthenticated: false,
       isLoading: false,
       error: null,
@@ -55,6 +56,8 @@ const useAuthStore = create(
             role: data.user?.role,
             tenant_id: data.tenant_id,
             tenant_name: data.tenant_name,
+            activeStoreId: null,
+            activeStoreName: null,
             isAuthenticated: true,
             isLoading: false,
             error: null
@@ -122,6 +125,8 @@ const useAuthStore = create(
             role: data.user?.role,
             tenant_id: data.tenant_id,
             tenant_name: data.tenant_name,
+            activeStoreId: null,
+            activeStoreName: null,
             isAuthenticated: true,
             isLoading: false,
             error: null
@@ -166,6 +171,7 @@ const useAuthStore = create(
           tenant_id: null,
           tenant_name: null,
           activeStoreId: null,
+          activeStoreName: null,
           isAuthenticated: false,
           error: null
         });
@@ -175,7 +181,7 @@ const useAuthStore = create(
       refreshUser: async () => {
         const token = tokenManager.getToken();
         if (!token) {
-          set({ user: null, role: null, tenant_id: null, tenant_name: null, activeStoreId: null, isAuthenticated: false });
+          set({ user: null, role: null, tenant_id: null, tenant_name: null, activeStoreId: null, activeStoreName: null, isAuthenticated: false });
           return;
         }
 
@@ -201,7 +207,7 @@ const useAuthStore = create(
         } catch (error) {
           // Token invalid or expired
           tokenManager.clearToken();
-          set({ user: null, role: null, tenant_id: null, tenant_name: null, activeStoreId: null, isAuthenticated: false, error: null });
+          set({ user: null, role: null, tenant_id: null, tenant_name: null, activeStoreId: null, activeStoreName: null, isAuthenticated: false, error: null });
         }
       },
 
@@ -215,13 +221,13 @@ const useAuthStore = create(
           } catch (error) {
             console.warn('Token refresh failed, clearing auth state:', error);
             tokenManager.clearToken();
-            set({ user: null, role: null, tenant_id: null, tenant_name: null, activeStoreId: null, isAuthenticated: false });
+            set({ user: null, role: null, tenant_id: null, tenant_name: null, activeStoreId: null, activeStoreName: null, isAuthenticated: false });
           } finally {
             set({ isLoading: false });
           }
         } else {
           // Ensure clean state when no token exists
-          set({ user: null, role: null, tenant_id: null, tenant_name: null, activeStoreId: null, isAuthenticated: false, isLoading: false });
+          set({ user: null, role: null, tenant_id: null, tenant_name: null, activeStoreId: null, activeStoreName: null, isAuthenticated: false, isLoading: false });
         }
       },
 
@@ -275,8 +281,8 @@ const useAuthStore = create(
       },
 
       // Store context methods for POS Terminal
-      setActiveStore: (storeId) => {
-        set({ activeStoreId: storeId });
+      setActiveStore: (storeId, storeName = null) => {
+        set({ activeStoreId: storeId, activeStoreName: storeName });
       },
 
       getActiveStoreId: () => {
@@ -285,7 +291,7 @@ const useAuthStore = create(
       },
 
       clearActiveStore: () => {
-        set({ activeStoreId: null });
+        set({ activeStoreId: null, activeStoreName: null });
       },
 
       isInStoreContext: () => {
@@ -296,6 +302,19 @@ const useAuthStore = create(
         }
         // Managers and cashiers are always in store context
         return role === 'manager' || role === 'cashier';
+      },
+
+      isSuperAdminInStoreContext: () => {
+        const { role, activeStoreId } = get();
+        return role === 'super_admin' && !!activeStoreId;
+      },
+
+      getEffectiveRole: () => {
+        const { role, activeStoreId } = get();
+        if (role === 'super_admin' && activeStoreId) {
+          return 'manager';
+        }
+        return role;
       },
 
       // Clear error
@@ -311,6 +330,7 @@ const useAuthStore = create(
         tenant_id: state.tenant_id,
         tenant_name: state.tenant_name,
         activeStoreId: state.activeStoreId,
+        activeStoreName: state.activeStoreName,
         isAuthenticated: state.isAuthenticated
       })
     }

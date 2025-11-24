@@ -31,13 +31,16 @@ const fallbackRoute = (role) => {
 const ProtectedRoute = ({ children, requiredRole = null }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const user = useAuthStore((state) => state.user);
+  const activeStoreId = useAuthStore((state) => state.activeStoreId);
+  const effectiveRole =
+    user?.role === 'super_admin' && activeStoreId ? 'manager' : user?.role;
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
   if (requiredRole && user?.role !== requiredRole) {
-    return <Navigate to={fallbackRoute(user?.role)} replace />;
+    return <Navigate to={fallbackRoute(effectiveRole || user?.role)} replace />;
   }
 
   return children;
@@ -69,7 +72,9 @@ function App() {
   const [isInitializing, setIsInitializing] = useState(true);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const user = useAuthStore((state) => state.user);
+  const activeStoreId = useAuthStore((state) => state.activeStoreId);
   const initializeAuth = useAuthStore((state) => state.initialize);
+  const role = useAuthStore((state) => state.role);
 
   useEffect(() => {
     let mounted = true;
@@ -101,7 +106,8 @@ function App() {
     );
   }
 
-  const defaultRoute = isAuthenticated ? fallbackRoute(user?.role) : '/login';
+  const effectiveRole = role === 'super_admin' && activeStoreId ? 'manager' : role;
+  const defaultRoute = isAuthenticated ? fallbackRoute(effectiveRole || user?.role) : '/login';
 
   return (
     <ErrorBoundary>

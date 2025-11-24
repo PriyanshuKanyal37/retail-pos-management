@@ -7,10 +7,10 @@ const Sidebar = () => {
 
   const user = useAuthStore((state) => state.user);
   const role = useAuthStore((state) => state.role);
+  const activeStoreId = useAuthStore((state) => state.activeStoreId);
+  const activeStoreName = useAuthStore((state) => state.activeStoreName);
   const logout = useAuthStore((state) => state.logout);
-  const isSuperAdmin = useAuthStore((state) => state.isSuperAdmin());
-  const isManager = useAuthStore((state) => state.isManager());
-  const isCashier = useAuthStore((state) => state.isCashier());
+  const clearActiveStore = useAuthStore((state) => state.clearActiveStore);
 
   const sidebarOpen = useUIStore((state) => state.sidebarOpen);
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
@@ -153,10 +153,22 @@ const Sidebar = () => {
     }
   ];
 
-  // Filter menu items based on user role
-  const availableMenuItems = menuItems.filter(item =>
-    item.roles.includes(role)
-  );
+  const isSuperAdminInStore = role === 'super_admin' && !!activeStoreId;
+  const effectiveRole = isSuperAdminInStore ? 'manager' : role;
+
+  // Filter menu items based on effective role while preserving super admin links
+  const availableMenuItems = menuItems.filter((item) => {
+    if (role === 'super_admin' && item.roles.includes('super_admin')) {
+      return true;
+    }
+    return effectiveRole ? item.roles.includes(effectiveRole) : false;
+  });
+
+  const handleExitStore = () => {
+    clearActiveStore();
+    showAlert('info', 'Returned to Super Admin view');
+    navigate('/stores');
+  };
 
   return (
     <aside
@@ -202,12 +214,37 @@ const Sidebar = () => {
                   {user?.name}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">
-                  {role === 'super_admin' ? 'Super Admin' :
-                   role === 'manager' ? 'Manager' :
-                   role === 'cashier' ? 'Cashier' : role}
+                  {role === 'super_admin'
+                    ? isSuperAdminInStore
+                      ? 'Super Admin (Store View)'
+                      : 'Super Admin'
+                    : role === 'manager'
+                      ? 'Manager'
+                      : role === 'cashier'
+                        ? 'Cashier'
+                        : role}
                 </p>
+                {isSuperAdminInStore && (
+                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 truncate">
+                    {activeStoreName ? `Store: ${activeStoreName}` : `Store ID: ${activeStoreId}`}
+                  </p>
+                )}
               </div>
             </div>
+          </div>
+        )}
+
+        {isSuperAdminInStore && sidebarOpen && (
+          <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-blue-50 dark:bg-blue-900/20">
+            <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
+              You are viewing the system as a store manager.
+            </p>
+            <button
+              onClick={handleExitStore}
+              className="w-full text-sm py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition"
+            >
+              Exit Store View
+            </button>
           </div>
         )}
 
@@ -229,6 +266,20 @@ const Sidebar = () => {
             </NavLink>
           ))}
         </nav>
+
+        {isSuperAdminInStore && !sidebarOpen && (
+          <div className="p-2 border-t border-gray-200 dark:border-gray-700">
+            <button
+              onClick={handleExitStore}
+              className="w-full flex items-center justify-center p-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition"
+              title="Exit Store View"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14m-7-7l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        )}
 
         <div className="p-4 border-t border-gray-200 dark:border-gray-700">
           <button
