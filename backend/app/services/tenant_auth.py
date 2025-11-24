@@ -56,13 +56,13 @@ class TenantAuthService:
 
     async def _execute_read(self, statement):
         """
-        Execute a read-only statement with autocommit isolation so that
-        PgBouncer session pooling doesn't terminate the connection.
+        Execute a read-only statement using a short-lived autocommit connection
+        to keep PgBouncer session pooling happy.
         """
-        conn = await self.session.connection(
-            execution_options={"isolation_level": "AUTOCOMMIT"}
-        )
-        return await conn.execute(statement)
+        async with self.session.bind.connect() as conn:  # type: ignore[attr-defined]
+            conn = conn.execution_options(isolation_level="AUTOCOMMIT")
+            result = await conn.execute(statement)
+            return result
 
     async def _authenticate_user_internal(
         self, email: str, password: str, tenant_domain: Optional[str] = None
