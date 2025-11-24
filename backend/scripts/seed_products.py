@@ -5,7 +5,6 @@ Run with: `python backend/scripts/seed_products.py`
 
 from __future__ import annotations
 
-import asyncio
 import sys
 from decimal import Decimal
 from dotenv import load_dotenv
@@ -28,7 +27,7 @@ if dotenv_path.is_file():
 else:
     load_dotenv()  # fall back to default lookup (may be set in environment)
 
-from app.db.session import AsyncSessionLocal  # noqa: E402  (import after sys.path tweak)
+from app.db.session import SessionLocal  # noqa: E402  (import after sys.path tweak)
 from app.models.product import Product  # noqa: E402
 
 TENANT_ID = UUID("25761c3c-0237-4ab6-b09e-de8411d32d24")
@@ -124,18 +123,18 @@ def product_rows() -> Iterable[ProductRow]:
     ]
 
 
-async def seed_products() -> None:
+def seed_products() -> None:
     """Insert or update products for the configured tenant/store."""
     created = 0
     updated = 0
 
-    async with AsyncSessionLocal() as session:
+    with SessionLocal() as session:
         for payload in product_rows():
             stmt = select(Product).where(
                 Product.tenant_id == TENANT_ID,
                 Product.sku == payload["sku"],
             )
-            existing = (await session.execute(stmt)).scalar_one_or_none()
+            existing = session.execute(stmt).scalar_one_or_none()
 
             if existing:
                 for field, value in payload.items():
@@ -152,10 +151,10 @@ async def seed_products() -> None:
                 )
                 created += 1
 
-        await session.commit()
+        session.commit()
 
     print(f"Seeded products. created={created}, updated={updated}")
 
 
 if __name__ == "__main__":
-    asyncio.run(seed_products())
+    seed_products()

@@ -16,9 +16,9 @@ def handle_service_errors(func: Callable) -> Callable:
     to appropriate HTTP responses with proper status codes.
     """
     @functools.wraps(func)
-    async def wrapper(*args, **kwargs) -> Any:
+    def wrapper(*args, **kwargs) -> Any:
         try:
-            return await func(*args, **kwargs)
+            return func(*args, **kwargs)
         except HTTPException:
             # Re-raise HTTP exceptions as-is (already properly formatted)
             raise

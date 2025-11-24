@@ -213,7 +213,7 @@ def create_application() -> FastAPI:
         )
 
     @app.get("/")
-    async def root():
+    def root():
         """Root endpoint to avoid 404 errors"""
         return {
             "service": settings.project_name,
@@ -230,7 +230,7 @@ def create_application() -> FastAPI:
         }
 
     @app.get("/health")
-    async def health_check():
+    def health_check():
         health_status = {
             "status": "healthy",
             "service": settings.project_name,

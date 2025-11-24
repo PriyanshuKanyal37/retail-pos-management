@@ -66,7 +66,7 @@ class PaginatedResponse(BaseModel, Generic[T]):
         )
 
 
-async def paginate_query(
+def paginate_query(
     query,
     session,
     pagination_params: PaginationParams,
@@ -90,12 +90,12 @@ async def paginate_query(
         # Use func.count() for SQLAlchemy 2.0
         from sqlalchemy import func
         count_query = query.order_by(None).with_only_columns(func.count())
-        result = await session.execute(count_query)
+        result = session.execute(count_query)
         total_count = result.scalar()
 
     # Apply pagination
     paginated_query = query.offset(pagination_params.offset).limit(pagination_params.limit)
-    items = await session.execute(paginated_query)
+    items = session.execute(paginated_query)
     items = items.scalars().all()
 
     return items, total_count

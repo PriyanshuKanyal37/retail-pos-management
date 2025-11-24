@@ -221,10 +221,10 @@ def log_execution_time(logger: logging.Logger, operation: str):
     """Decorator to log execution time of functions"""
     def decorator(func):
         @wraps(func)
-        async def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs):
             start_time = time.time()
             try:
-                result = await func(*args, **kwargs)
+                result = func(*args, **kwargs)
                 execution_time = time.time() - start_time
 
                 logger.info(
