@@ -69,6 +69,11 @@ const useAuthStore = create(
             message: data.message
           };
         } catch (error) {
+          const backendMessage =
+            error?.response?.data?.detail ||
+            error?.response?.data?.message ||
+            error.message ||
+            'Signup failed';
           set({
             user: null,
             role: null,
@@ -76,12 +81,12 @@ const useAuthStore = create(
             tenant_name: null,
             isAuthenticated: false,
             isLoading: false,
-            error: error.message || 'Signup failed'
+            error: backendMessage
           });
 
           return {
             success: false,
-            message: error.message || 'Failed to create account'
+            message: backendMessage || 'Failed to create account'
           };
         }
       },
@@ -130,6 +135,11 @@ const useAuthStore = create(
             tenant_name: data.tenant_name
           };
         } catch (error) {
+          const backendMessage =
+            error?.response?.data?.detail ||
+            error?.response?.data?.message ||
+            error.message ||
+            'Login failed';
           set({
             user: null,
             role: null,
@@ -137,12 +147,12 @@ const useAuthStore = create(
             tenant_name: null,
             isAuthenticated: false,
             isLoading: false,
-            error: error.message || 'Login failed'
+            error: backendMessage
           });
 
           return {
             success: false,
-            message: error.message || 'Invalid credentials or inactive account'
+            message: backendMessage || 'Invalid credentials or inactive account'
           };
         }
       },
