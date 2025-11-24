@@ -6,6 +6,11 @@ engine = create_async_engine(
     echo=settings.app_env == "development",
     pool_size=5,
     max_overflow=10,
+    connect_args={
+        # Disable prepared statements so Supabase PgBouncer session pooler
+        # does not drop connections mid-request.
+        "prepared_statement_cache_size": 0,
+    },
 )
 
 AsyncSessionLocal = async_sessionmaker[AsyncSession](

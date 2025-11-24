@@ -54,6 +54,16 @@ class TenantAuthService:
     def __init__(self, session: AsyncSession):
         self.session = session
 
+    async def _execute_read(self, statement):
+        """
+        Execute a read-only statement with autocommit isolation so that
+        PgBouncer session pooling doesn't terminate the connection.
+        """
+        conn = await self.session.connection(
+            execution_options={"isolation_level": "AUTOCOMMIT"}
+        )
+        return await conn.execute(statement)
+
     async def _authenticate_user_internal(
         self, email: str, password: str, tenant_domain: Optional[str] = None
     ) -> Tuple[User, UUID]:
@@ -90,7 +100,7 @@ class TenantAuthService:
         if tenant_domain:
             statement = statement.where(Tenant.domain == tenant_domain.lower())
 
-        result = await self.session.execute(statement)
+        result = await self._execute_read(statement)
         row = result.first()
 
         if not row:
@@ -170,7 +180,7 @@ class TenantAuthService:
             TenantNotFoundError: Tenant doesn't exist or is inactive
         """
         # Verify tenant exists and is active
-        tenant = await self.session.execute(
+        tenant = await self._execute_read(
             select(Tenant).where(
                 and_(
                     Tenant.id == tenant_id,
@@ -306,7 +316,7 @@ class TenantAuthService:
         Returns:
             True if user belongs to tenant, False otherwise
         """
-        result = await self.session.execute(
+        result = await self._execute_read(
             select(User).where(
                 and_(
                     User.id == user_id,
@@ -332,7 +342,7 @@ class TenantAuthService:
         """
         if tenant_id:
             # Search within specific tenant
-            result = await self.session.execute(
+            result = await self._execute_read(
                 select(User).where(
                     and_(
                         User.email == email.lower(),
@@ -343,7 +353,7 @@ class TenantAuthService:
             )
         else:
             # Search across all tenants (for super admin registration check)
-            result = await self.session.execute(
+            result = await self._execute_read(
                 select(User).where(
                     and_(
                         User.email == email.lower(),
@@ -371,7 +381,7 @@ class TenantAuthService:
         Raises:
             AuthError: Insufficient permissions
         """
-        user = await self.session.execute(
+        user = await self._execute_read(
             select(User).where(
                 and_(
                     User.id == user_id,
