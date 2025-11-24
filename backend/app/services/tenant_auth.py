@@ -106,7 +106,9 @@ class TenantAuthService:
         if not row:
             raise InvalidCredentialsError()
 
-        user, tenant = row
+        # SQLAlchemy returns Row objects; unpack explicitly to avoid
+        # "too many values to unpack" errors in PgBouncer-safe mode.
+        user, tenant = row[0], row[1]
 
         # Verify password
         if not verify_password(password, user.password_hash):
