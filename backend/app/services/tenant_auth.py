@@ -3,7 +3,7 @@ from uuid import UUID
 
 from sqlalchemy import select, and_
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.models.user import User
 from app.models.tenant import Tenant
@@ -51,20 +51,23 @@ class UserTenantMismatchError(AuthError):
 class TenantAuthService:
     """Production-level authentication service with tenant context"""
 
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: Session):
         self.session = session
 
-    async def _execute_read(self, statement):
+    def _execute_read(self, statement):
         """
         Execute a read-only statement using a short-lived autocommit connection
         to keep PgBouncer session pooling happy.
         """
-        async with self.session.bind.connect() as conn:  # type: ignore[attr-defined]
-            await conn.execution_options(isolation_level="AUTOCOMMIT")
-            result = await conn.execute(statement)
+        bind = self.session.get_bind()
+        if bind is None:
+            raise RuntimeError("Database session is not bound to an engine")
+        with bind.connect() as conn:  # type: ignore[attr-defined]
+            conn = conn.execution_options(isolation_level="AUTOCOMMIT")
+            result = conn.execute(statement)
             return result
 
-    async def _authenticate_user_internal(
+    def _authenticate_user_internal(
         self, email: str, password: str, tenant_domain: Optional[str] = None
     ) -> Tuple[User, UUID]:
         """
@@ -100,7 +103,7 @@ class TenantAuthService:
         if tenant_domain:
             statement = statement.where(Tenant.domain == tenant_domain.lower())
 
-        result = await self._execute_read(statement)
+        result = self._execute_read(statement)
         row = result.first()
 
         if not row:
@@ -116,7 +119,7 @@ class TenantAuthService:
 
         return user, tenant.id
 
-    async def login(
+    def login(
         self, login_request: LoginRequest, tenant_domain: Optional[str] = None
     ) -> LoginResponse:
         """
@@ -130,7 +133,7 @@ class TenantAuthService:
             LoginResponse with access token and user info
         """
         try:
-            user, tenant_id = await self._authenticate_user_internal(
+            user, tenant_id = self._authenticate_user_internal(
                 login_request.email, login_request.password, tenant_domain
             )
         except AuthError:
@@ -160,7 +163,7 @@ class TenantAuthService:
             }
         )
 
-    async def create_user_with_tenant(
+    def create_user_with_tenant(
         self,
         user_data: UserCreate,
         tenant_id: UUID,
@@ -182,7 +185,7 @@ class TenantAuthService:
             TenantNotFoundError: Tenant doesn't exist or is inactive
         """
         # Verify tenant exists and is active
-        tenant = await self._execute_read(
+        tenant = self._execute_read(
             select(Tenant).where(
                 and_(
                     Tenant.id == tenant_id,
@@ -215,16 +218,16 @@ class TenantAuthService:
         self.session.add(user)
 
         try:
-            await self.session.commit()
-            await self.session.refresh(user)
+            self.session.commit()
+            self.session.refresh(user)
             return user
         except IntegrityError as exc:
-            await self.session.rollback()
+            self.session.rollback()
             if "email" in str(exc).lower():
                 raise AuthError("Email already exists within this tenant", "EMAIL_EXISTS")
             raise AuthError("Failed to create user", "USER_CREATION_ERROR") from exc
 
-    async def register_user(
+    def register_user(
         self,
         email: str,
         password: str,
@@ -257,7 +260,7 @@ class TenantAuthService:
         )
 
         # Create user in tenant
-        user = await self.create_user_with_tenant(user_data, tenant_id, "super_admin")
+        user = self.create_user_with_tenant(user_data, tenant_id, "super_admin")
 
         # Create access token for the new user
         access_token = create_access_token(
@@ -279,7 +282,7 @@ class TenantAuthService:
             }
         )
 
-    async def authenticate_user(
+    def authenticate_user(
         self, email: str, password: str, tenant_domain: Optional[str] = None
     ) -> LoginResponse:
         """
@@ -303,9 +306,9 @@ class TenantAuthService:
         login_request = LoginRequest(email=email, password=password, tenant_domain=tenant_domain)
 
         # Use existing login method
-        return await self.login(login_request, tenant_domain)
+        return self.login(login_request, tenant_domain)
 
-    async def verify_user_belongs_to_tenant(
+    def verify_user_belongs_to_tenant(
         self, user_id: UUID, tenant_id: UUID
     ) -> bool:
         """
@@ -318,7 +321,7 @@ class TenantAuthService:
         Returns:
             True if user belongs to tenant, False otherwise
         """
-        result = await self._execute_read(
+        result = self._execute_read(
             select(User).where(
                 and_(
                     User.id == user_id,
@@ -329,7 +332,7 @@ class TenantAuthService:
         )
         return result.scalar_one_or_none() is not None
 
-    async def get_user_by_email_for_tenant(
+    def get_user_by_email_for_tenant(
         self, email: str, tenant_id: Optional[UUID]
     ) -> Optional[User]:
         """
@@ -344,7 +347,7 @@ class TenantAuthService:
         """
         if tenant_id:
             # Search within specific tenant
-            result = await self._execute_read(
+            result = self._execute_read(
                 select(User).where(
                     and_(
                         User.email == email.lower(),
@@ -355,7 +358,7 @@ class TenantAuthService:
             )
         else:
             # Search across all tenants (for super admin registration check)
-            result = await self._execute_read(
+            result = self._execute_read(
                 select(User).where(
                     and_(
                         User.email == email.lower(),
@@ -366,7 +369,7 @@ class TenantAuthService:
             )
         return result.scalar_one_or_none()
 
-    async def deactivate_user(
+    def deactivate_user(
         self, user_id: UUID, tenant_id: UUID, deactivator_role: str
     ) -> bool:
         """
@@ -383,7 +386,7 @@ class TenantAuthService:
         Raises:
             AuthError: Insufficient permissions
         """
-        user = await self._execute_read(
+        user = self._execute_read(
             select(User).where(
                 and_(
                     User.id == user_id,
@@ -401,5 +404,5 @@ class TenantAuthService:
             raise AuthError("Only super admins can deactivate super admin users", "INSUFFICIENT_PERMISSIONS")
 
         user.status = "inactive"
-        await self.session.commit()
+        self.session.commit()
         return True
