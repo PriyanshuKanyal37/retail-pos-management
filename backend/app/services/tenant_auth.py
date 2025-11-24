@@ -59,8 +59,8 @@ class TenantAuthService:
         Execute a read-only statement using a short-lived autocommit connection
         to keep PgBouncer session pooling happy.
         """
-        async with await self.session.bind.connect() as conn:  # type: ignore[attr-defined]
-            conn = conn.execution_options(isolation_level="AUTOCOMMIT")
+        async with self.session.bind.connect() as conn:  # type: ignore[attr-defined]
+            await conn.execution_options(isolation_level="AUTOCOMMIT")
             result = await conn.execute(statement)
             return result
 
