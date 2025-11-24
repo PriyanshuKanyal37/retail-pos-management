@@ -103,15 +103,13 @@ class TenantAuthService:
         if tenant_domain:
             statement = statement.where(Tenant.domain == tenant_domain.lower())
 
-        result = self._execute_read(statement)
+        result = self.session.execute(statement)
         row = result.first()
 
         if not row:
             raise InvalidCredentialsError()
 
-        # SQLAlchemy returns Row objects; unpack explicitly to avoid
-        # "too many values to unpack" errors in PgBouncer-safe mode.
-        user, tenant = row[0], row[1]
+        user, tenant = row
 
         # Verify password
         if not verify_password(password, user.password_hash):
