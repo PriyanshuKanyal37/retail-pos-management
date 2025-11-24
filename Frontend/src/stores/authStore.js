@@ -31,8 +31,10 @@ const useAuthStore = create(
             role
           });
 
-          // Store JWT token securely
-          if (!tokenManager.setToken(response.token)) {
+          const accessToken = response.access_token || response.token;
+
+          // Store JWT token securely (signup now returns access_token)
+          if (!accessToken || !tokenManager.setToken(accessToken)) {
             throw new Error('Failed to secure authentication token');
           }
 
@@ -90,8 +92,10 @@ const useAuthStore = create(
           // Call backend API
           const response = await api.auth.login(email, password);
 
-          // Store JWT token securely
-          if (!tokenManager.setToken(response.token)) {
+          const accessToken = response.access_token || response.token;
+
+          // Store JWT token securely (login returns access_token)
+          if (!accessToken || !tokenManager.setToken(accessToken)) {
             throw new Error('Failed to secure authentication token');
           }
 
