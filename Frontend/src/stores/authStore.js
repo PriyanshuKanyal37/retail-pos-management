@@ -31,7 +31,8 @@ const useAuthStore = create(
             role
           });
 
-          const accessToken = response.access_token || response.token;
+          const data = response?.data ?? response ?? {};
+          const accessToken = data.access_token || data.token;
 
           // Store JWT token securely (signup now returns access_token)
           if (!accessToken || !tokenManager.setToken(accessToken)) {
@@ -40,20 +41,20 @@ const useAuthStore = create(
 
           // Store user data and tenant info from new backend response
           const user = {
-            id: response.user.id,
-            name: response.user.name,
-            email: response.user.email,
-            role: response.user.role,
-            tenant_id: response.user.tenant_id,
-            store_id: response.user.store_id,
-            status: response.user.status
+            id: data.user?.id,
+            name: data.user?.name,
+            email: data.user?.email,
+            role: data.user?.role,
+            tenant_id: data.user?.tenant_id,
+            store_id: data.user?.store_id,
+            status: data.user?.status
           };
 
           set({
             user,
-            role: response.user.role,
-            tenant_id: response.tenant_id,
-            tenant_name: response.tenant_name,
+            role: data.user?.role,
+            tenant_id: data.tenant_id,
+            tenant_name: data.tenant_name,
             isAuthenticated: true,
             isLoading: false,
             error: null
@@ -62,10 +63,10 @@ const useAuthStore = create(
           return {
             success: true,
             user,
-            role: response.user.role,
-            tenant_id: response.tenant_id,
-            tenant_name: response.tenant_name,
-            message: response.message
+            role: data.user?.role,
+            tenant_id: data.tenant_id,
+            tenant_name: data.tenant_name,
+            message: data.message
           };
         } catch (error) {
           set({
@@ -92,7 +93,8 @@ const useAuthStore = create(
           // Call backend API
           const response = await api.auth.login(email, password);
 
-          const accessToken = response.access_token || response.token;
+          const data = response?.data ?? response ?? {};
+          const accessToken = data.access_token || data.token;
 
           // Store JWT token securely (login returns access_token)
           if (!accessToken || !tokenManager.setToken(accessToken)) {
@@ -101,20 +103,20 @@ const useAuthStore = create(
 
           // Store user data and tenant info from new backend response
           const user = {
-            id: response.user.id,
-            name: response.user.name,
-            email: response.user.email,
-            role: response.user.role,
-            tenant_id: response.user.tenant_id,
-            store_id: response.user.store_id,
-            status: response.user.status
+            id: data.user?.id,
+            name: data.user?.name,
+            email: data.user?.email,
+            role: data.user?.role,
+            tenant_id: data.user?.tenant_id,
+            store_id: data.user?.store_id,
+            status: data.user?.status
           };
 
           set({
             user,
-            role: response.user.role,
-            tenant_id: response.tenant_id,
-            tenant_name: response.tenant_name,
+            role: data.user?.role,
+            tenant_id: data.tenant_id,
+            tenant_name: data.tenant_name,
             isAuthenticated: true,
             isLoading: false,
             error: null
@@ -123,9 +125,9 @@ const useAuthStore = create(
           return {
             success: true,
             user,
-            role: response.user.role,
-            tenant_id: response.tenant_id,
-            tenant_name: response.tenant_name
+            role: data.user?.role,
+            tenant_id: data.tenant_id,
+            tenant_name: data.tenant_name
           };
         } catch (error) {
           set({
