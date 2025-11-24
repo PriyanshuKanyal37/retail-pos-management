@@ -3,7 +3,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.core.security import get_password_hash, verify_password
 from app.models.user import User
@@ -18,13 +18,13 @@ class InvalidManagerError(Exception):
     """Raised when cashier-manager relationships are invalid."""
 
 
-async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
-    result = await session.execute(select(User).where(User.email == email.lower()))
+def get_user_by_email(session: Session, email: str) -> User | None:
+    result = session.execute(select(User).where(User.email == email.lower()))
     return result.scalar_one_or_none()
 
 
-async def list_users(
-    session: AsyncSession,
+def list_users(
+    session: Session,
     tenant_id: UUID | None = None,
     store_id: UUID | None = None,
     role: str | None = None
@@ -41,24 +41,24 @@ async def list_users(
         query = query.where(User.role == role)
 
     query = query.order_by(User.created_at.desc())
-    result = await session.execute(query)
+    result = session.execute(query)
     return result.scalars().all()
 
 
-async def _get_admin_by_id(session: AsyncSession, admin_id: UUID) -> User:
-    result = await session.execute(select(User).where(User.id == admin_id))
+def _get_admin_by_id(session: Session, admin_id: UUID) -> User:
+    result = session.execute(select(User).where(User.id == admin_id))
     admin = result.scalar_one_or_none()
     if not admin or admin.role != UserRole.ADMIN:
         raise InvalidManagerError("Manager must reference an existing admin user")
     return admin
 
 
-async def create_user(session: AsyncSession, payload: UserCreate) -> User:
+def create_user(session: Session, payload: UserCreate) -> User:
     role_value = payload.role.value if isinstance(payload.role, UserRole) else str(payload.role)
     status_value = payload.status.value if payload.status else "active"
 
     # Validate role-based assignments
-    await _validate_user_assignments(session, payload)
+    _validate_user_assignments(session, payload)
 
     user = User(
         tenant_id=payload.tenant_id,
@@ -71,16 +71,16 @@ async def create_user(session: AsyncSession, payload: UserCreate) -> User:
     )
     session.add(user)
     try:
-        await session.commit()
+        session.commit()
     except IntegrityError as exc:
-        await session.rollback()
+        session.rollback()
         raise DuplicateEmailError from exc
-    await session.refresh(user)
+    session.refresh(user)
     return user
 
 
-async def update_user(session: AsyncSession, user_id: UUID, payload: UserUpdate) -> User | None:
-    result = await session.execute(select(User).where(User.id == user_id))
+def update_user(session: Session, user_id: UUID, payload: UserUpdate) -> User | None:
+    result = session.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
         return None
@@ -103,21 +103,21 @@ async def update_user(session: AsyncSession, user_id: UUID, payload: UserUpdate)
         user.password_hash = get_password_hash(payload.password)
 
     # Validate role-based assignments
-    await _validate_user_updates(session, user_id, payload)
+    _validate_user_updates(session, user_id, payload)
 
-    await session.commit()
-    await session.refresh(user)
+    session.commit()
+    session.refresh(user)
     return user
 
 
-async def authenticate_user(session: AsyncSession, email: str, password: str) -> User | None:
-    user = await get_user_by_email(session, email)
+def authenticate_user(session: Session, email: str, password: str) -> User | None:
+    user = get_user_by_email(session, email)
     if not user or not verify_password(password, user.password_hash):
         return None
     return user
 
 
-async def _validate_user_assignments(session: AsyncSession, payload: UserCreate) -> None:
+def _validate_user_assignments(session: Session, payload: UserCreate) -> None:
     """Validate user role-based assignments during creation."""
     role_value = payload.role.value if isinstance(payload.role, UserRole) else str(payload.role)
 
@@ -130,10 +130,10 @@ async def _validate_user_assignments(session: AsyncSession, payload: UserCreate)
         raise InvalidManagerError("Super admin cannot be assigned to a specific store")
 
 
-async def _validate_user_updates(session: AsyncSession, user_id: UUID, payload: UserUpdate) -> None:
+def _validate_user_updates(session: Session, user_id: UUID, payload: UserUpdate) -> None:
     """Validate user role-based assignments during updates."""
     # Get current user to check role changes
-    result = await session.execute(select(User).where(User.id == user_id))
+    result = session.execute(select(User).where(User.id == user_id))
     current_user = result.scalar_one_or_none()
     if not current_user:
         raise InvalidManagerError("User not found")
@@ -156,6 +156,6 @@ async def _validate_user_updates(session: AsyncSession, user_id: UUID, payload: 
     # Validate store assignment exists
     if payload.store_id is not None:
         from app.models.store import Store
-        store_result = await session.execute(select(Store).where(Store.id == payload.store_id))
+        store_result = session.execute(select(Store).where(Store.id == payload.store_id))
         if not store_result.scalar_one_or_none():
             raise InvalidManagerError("Assigned store does not exist")

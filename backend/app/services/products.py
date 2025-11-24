@@ -3,7 +3,7 @@ from uuid import UUID
 
 from sqlalchemy import and_, or_, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.models.product import Product
 from app.models.user import User
@@ -44,65 +44,65 @@ def resolve_product_owner_id(user: User) -> UUID:
     raise UnauthorizedProductAccessError("Unsupported role for product access")
 
 
-async def get_product_by_sku(session: AsyncSession, sku: str) -> Product | None:
+def get_product_by_sku(session: Session, sku: str) -> Product | None:
     """Get a product by SKU."""
     statement = select(Product).where(Product.sku == sku)
-    result = await session.execute(statement)
+    result = session.execute(statement)
     return result.scalar_one_or_none()
 
 
-async def get_product_by_barcode(session: AsyncSession, barcode: str) -> Product | None:
+def get_product_by_barcode(session: Session, barcode: str) -> Product | None:
     """Get a product by barcode."""
     statement = select(Product).where(Product.barcode == barcode)
-    result = await session.execute(statement)
+    result = session.execute(statement)
     return result.scalar_one_or_none()
 
 
-async def list_products(session: AsyncSession, *, owner_id: UUID) -> Sequence[Product]:
+def list_products(session: Session, *, owner_id: UUID) -> Sequence[Product]:
     """Get all products owned by a specific super admin/manager ordered by name."""
     statement = (
         select(Product)
         .where(Product.owner_id == owner_id)
         .order_by(Product.name.asc())
     )
-    result = await session.execute(statement)
+    result = session.execute(statement)
     return result.scalars().all()
 
 
-async def get_product(session: AsyncSession, product_id: UUID) -> Product | None:
+def get_product(session: Session, product_id: UUID) -> Product | None:
     """Get a single product by ID (without ownership filtering)."""
     statement = select(Product).where(Product.id == product_id)
-    result = await session.execute(statement)
+    result = session.execute(statement)
     return result.scalar_one_or_none()
 
 
-async def get_product_for_owner(
-    session: AsyncSession, product_id: UUID, owner_id: UUID
+def get_product_for_owner(
+    session: Session, product_id: UUID, owner_id: UUID
 ) -> Product | None:
     """Retrieve a product ensuring it belongs to the specified owner."""
     statement = select(Product).where(
         Product.id == product_id,
         Product.owner_id == owner_id,
     )
-    result = await session.execute(statement)
+    result = session.execute(statement)
     return result.scalar_one_or_none()
 
 
-async def create_product(
-    session: AsyncSession,
+def create_product(
+    session: Session,
     payload: ProductCreate,
     *,
     owner_id: UUID,
 ) -> Product:
     """Create a new product."""
     # Check for duplicate SKU
-    existing = await get_product_by_sku(session, payload.sku)
+    existing = get_product_by_sku(session, payload.sku)
     if existing:
         raise DuplicateSKUError(f"Product with SKU '{payload.sku}' already exists")
 
     # Check for duplicate barcode if provided
     if payload.barcode:
-        existing = await get_product_by_barcode(session, payload.barcode)
+        existing = get_product_by_barcode(session, payload.barcode)
         if existing:
             raise DuplicateBarcodeError(f"Product with barcode '{payload.barcode}' already exists")
 
@@ -120,10 +120,10 @@ async def create_product(
     session.add(product)
 
     try:
-        await session.commit()
-        await session.refresh(product)
+        session.commit()
+        session.refresh(product)
     except IntegrityError as exc:
-        await session.rollback()
+        session.rollback()
         if "sku" in str(exc).lower():
             raise DuplicateSKUError(f"Product with SKU '{payload.sku}' already exists") from exc
         elif "barcode" in str(exc).lower():
@@ -133,27 +133,27 @@ async def create_product(
     return product
 
 
-async def update_product(
-    session: AsyncSession,
+def update_product(
+    session: Session,
     product_id: UUID,
     payload: ProductUpdate,
     *,
     owner_id: UUID,
 ) -> Product | None:
     """Update an existing product."""
-    product = await get_product_for_owner(session, product_id, owner_id)
+    product = get_product_for_owner(session, product_id, owner_id)
     if not product:
         return None
 
     # Check for duplicate SKU if updating
     if payload.sku and payload.sku != product.sku:
-        existing = await get_product_by_sku(session, payload.sku)
+        existing = get_product_by_sku(session, payload.sku)
         if existing:
             raise DuplicateSKUError(f"Product with SKU '{payload.sku}' already exists")
 
     # Check for duplicate barcode if updating
     if payload.barcode and payload.barcode != product.barcode:
-        existing = await get_product_by_barcode(session, payload.barcode)
+        existing = get_product_by_barcode(session, payload.barcode)
         if existing:
             raise DuplicateBarcodeError(f"Product with barcode '{payload.barcode}' already exists")
 
@@ -163,10 +163,10 @@ async def update_product(
         setattr(product, field, value)
 
     try:
-        await session.commit()
-        await session.refresh(product)
+        session.commit()
+        session.refresh(product)
     except IntegrityError as exc:
-        await session.rollback()
+        session.rollback()
         if "sku" in str(exc).lower():
             raise DuplicateSKUError(f"Product with SKU '{payload.sku}' already exists") from exc
         elif "barcode" in str(exc).lower():
@@ -176,8 +176,8 @@ async def update_product(
     return product
 
 
-async def delete_product(
-    session: AsyncSession,
+def delete_product(
+    session: Session,
     product_id: UUID,
     *,
     owner_id: UUID,
@@ -186,17 +186,17 @@ async def delete_product(
     Soft delete a product by setting status to 'inactive'.
     Returns True if product was found and deleted, False otherwise.
     """
-    product = await get_product_for_owner(session, product_id, owner_id)
+    product = get_product_for_owner(session, product_id, owner_id)
     if not product:
         return False
 
     product.status = "inactive"
-    await session.commit()
+    session.commit()
     return True
 
 
-async def get_low_stock_products(
-    session: AsyncSession,
+def get_low_stock_products(
+    session: Session,
     owner_id: UUID,
     threshold: int = 5,
 ) -> Sequence[Product]:
@@ -208,7 +208,7 @@ async def get_low_stock_products(
         .where(Product.owner_id == owner_id)
         .order_by(Product.stock.asc())
     )
-    result = await session.execute(statement)
+    result = session.execute(statement)
     return result.scalars().all()
 
 

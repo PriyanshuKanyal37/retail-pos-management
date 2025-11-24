@@ -3,7 +3,7 @@ from uuid import UUID
 
 from sqlalchemy import select, and_
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.models.customer import Customer
 from app.schemas.customer import CustomerCreate, CustomerUpdate
@@ -13,8 +13,8 @@ class DuplicatePhoneError(Exception):
     """Raised when a customer phone already exists."""
 
 
-async def list_customers(session: AsyncSession, *, tenant_id: UUID) -> Sequence[Customer]:
-    result = await session.execute(
+def list_customers(session: Session, *, tenant_id: UUID) -> Sequence[Customer]:
+    result = session.execute(
         select(Customer)
         .where(Customer.tenant_id == tenant_id)
         .order_by(Customer.created_at.desc())
@@ -22,8 +22,8 @@ async def list_customers(session: AsyncSession, *, tenant_id: UUID) -> Sequence[
     return result.scalars().all()
 
 
-async def get_customer(session: AsyncSession, customer_id: UUID, *, tenant_id: UUID) -> Customer | None:
-    result = await session.execute(
+def get_customer(session: Session, customer_id: UUID, *, tenant_id: UUID) -> Customer | None:
+    result = session.execute(
         select(Customer).where(
             and_(Customer.id == customer_id, Customer.tenant_id == tenant_id)
         )
@@ -31,8 +31,8 @@ async def get_customer(session: AsyncSession, customer_id: UUID, *, tenant_id: U
     return result.scalar_one_or_none()
 
 
-async def create_customer(
-    session: AsyncSession,
+def create_customer(
+    session: Session,
     payload: CustomerCreate,
     *,
     tenant_id: UUID,
@@ -46,18 +46,18 @@ async def create_customer(
     )
     session.add(customer)
     try:
-        await session.commit()
+        session.commit()
     except IntegrityError as exc:
-        await session.rollback()
+        session.rollback()
         raise DuplicatePhoneError from exc
-    await session.refresh(customer)
+    session.refresh(customer)
     return customer
 
 
-async def update_customer(
-    session: AsyncSession, customer_id: UUID, payload: CustomerUpdate, *, tenant_id: UUID
+def update_customer(
+    session: Session, customer_id: UUID, payload: CustomerUpdate, *, tenant_id: UUID
 ) -> Customer | None:
-    customer = await get_customer(session, customer_id, tenant_id=tenant_id)
+    customer = get_customer(session, customer_id, tenant_id=tenant_id)
     if not customer:
         return None
 
@@ -67,9 +67,9 @@ async def update_customer(
         customer.phone = payload.phone
 
     try:
-        await session.commit()
+        session.commit()
     except IntegrityError as exc:
-        await session.rollback()
+        session.rollback()
         raise DuplicatePhoneError from exc
-    await session.refresh(customer)
+    session.refresh(customer)
     return customer
