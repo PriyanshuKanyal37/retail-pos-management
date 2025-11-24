@@ -279,7 +279,7 @@ def create_product(
     """
     try:
         user, tenant_id = user_tenant
-    product_data, image_upload = _parse_product_payload(request, ProductCreate)
+        product_data, image_upload = _parse_product_payload(request, ProductCreate)
 
         # Validate store_id - users can only create products in their assigned store
         if not product_data.store_id:
@@ -291,7 +291,7 @@ def create_product(
                     detail="Store ID is required"
                 )
 
-    image_content, image_filename = _read_image_upload(image_upload)
+        image_content, image_filename = _read_image_upload(image_upload)
 
         product = product_service.create_product_with_image(
             product_data=product_data,
@@ -332,8 +332,8 @@ def update_product(
     try:
         user, tenant_id = user_tenant
 
-    product_data, image_upload = _parse_product_payload(request, ProductUpdate)
-    new_image_content, new_image_filename = _read_image_upload(image_upload)
+        product_data, image_upload = _parse_product_payload(request, ProductUpdate)
+        new_image_content, new_image_filename = _read_image_upload(image_upload)
 
         product = product_service.update_product_with_image(
             product_id=product_id,

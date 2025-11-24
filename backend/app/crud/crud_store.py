@@ -203,7 +203,7 @@ class CRUDStore(CRUDBase[Store, StoreCreate, StoreUpdate]):
             Dictionary with store statistics
         """
         # Verify store exists and belongs to tenant if tenant_id provided
-        store =  self.get(db, id=store_id, tenant_id=tenant_id)
+        store = self.get(db, id=store_id, tenant_id=tenant_id)
         if not store:
             return {}
 
@@ -298,8 +298,8 @@ class CRUDStore(CRUDBase[Store, StoreCreate, StoreUpdate]):
 
         store.status = status
         db.add(store)
-         db.commit()
-         db.refresh(store)
+        db.commit()
+        db.refresh(store)
         return store
 
 

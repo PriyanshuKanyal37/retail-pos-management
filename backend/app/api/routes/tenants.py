@@ -159,7 +159,7 @@ def delete_tenant(
     This deactivates the tenant but preserves all data for compliance
     and potential reactivation.
     """
-     service.deactivate_tenant(tenant_id)
+    service.deactivate_tenant(tenant_id)
 
 
 @router.get("/{tenant_id}/statistics", response_model=TenantStatisticsResponse)
@@ -176,7 +176,7 @@ def get_tenant_statistics(
     customer data, and sales information for the specified tenant.
     """
     try:
-        statistics =  service.get_tenant_statistics(tenant_id)
+        statistics = service.get_tenant_statistics(tenant_id)
         return statistics
     except TenantNotFoundError:
         raise HTTPException(
@@ -206,7 +206,7 @@ def create_tenant_user(
     """
     # Validate tenant exists and is active
     tenant_service = TenantManagementService(auth_service.session)
-    tenant =  tenant_service.get_tenant_by_id(tenant_id)
+    tenant = tenant_service.get_tenant_by_id(tenant_id)
 
     if not tenant:
         raise HTTPException(

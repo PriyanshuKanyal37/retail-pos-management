@@ -57,16 +57,16 @@ class CRUDSetting(CRUDBase[Setting, dict, SettingUpdate]):
             Created or updated setting instance
         """
         # Try to get existing settings
-        existing_setting =  self.get_by_tenant(db, tenant_id=tenant_id)
+        existing_setting = self.get_by_tenant(db, tenant_id=tenant_id)
 
         if existing_setting:
             # Update existing settings
             update_data = {k: v for k, v in setting_data.items() if v is not None}
-            return  self.update(db, db_obj=existing_setting, obj_in=update_data)
+            return self.update(db, db_obj=existing_setting, obj_in=update_data)
         else:
             # Create new settings
             setting_data["tenant_id"] = tenant_id
-            return  self.create(db, obj_in=setting_data)
+            return self.create(db, obj_in=setting_data)
 
     def update_theme(
         self,
@@ -86,12 +86,12 @@ class CRUDSetting(CRUDBase[Setting, dict, SettingUpdate]):
         Returns:
             Updated setting instance or None if not found
         """
-        setting =  self.get_by_tenant(db, tenant_id=tenant_id)
+        setting = self.get_by_tenant(db, tenant_id=tenant_id)
 
         if setting:
             setting.theme = theme
-             db.commit()
-             db.refresh(setting)
+            db.commit()
+            db.refresh(setting)
 
         return setting
 
@@ -113,12 +113,12 @@ class CRUDSetting(CRUDBase[Setting, dict, SettingUpdate]):
         Returns:
             Updated setting instance or None if not found
         """
-        setting =  self.get_by_tenant(db, tenant_id=tenant_id)
+        setting = self.get_by_tenant(db, tenant_id=tenant_id)
 
         if setting:
             setting.low_stock_threshold = threshold
-             db.commit()
-             db.refresh(setting)
+            db.commit()
+            db.refresh(setting)
 
         return setting
 
@@ -148,7 +148,7 @@ class CRUDSetting(CRUDBase[Setting, dict, SettingUpdate]):
         Returns:
             Updated setting instance or None if not found
         """
-        setting =  self.get_by_tenant(db, tenant_id=tenant_id)
+        setting = self.get_by_tenant(db, tenant_id=tenant_id)
 
         if setting:
             setting.store_name = store_name
@@ -161,8 +161,8 @@ class CRUDSetting(CRUDBase[Setting, dict, SettingUpdate]):
             if store_logo_url is not None:
                 setting.store_logo_url = store_logo_url
 
-             db.commit()
-             db.refresh(setting)
+            db.commit()
+            db.refresh(setting)
 
         return setting
 
@@ -188,7 +188,7 @@ class CRUDSetting(CRUDBase[Setting, dict, SettingUpdate]):
         Returns:
             Updated setting instance or None if not found
         """
-        setting =  self.get_by_tenant(db, tenant_id=tenant_id)
+        setting = self.get_by_tenant(db, tenant_id=tenant_id)
 
         if setting:
             if upi_id is not None:
@@ -198,8 +198,8 @@ class CRUDSetting(CRUDBase[Setting, dict, SettingUpdate]):
             if currency_code is not None:
                 setting.currency_code = currency_code
 
-             db.commit()
-             db.refresh(setting)
+            db.commit()
+            db.refresh(setting)
 
         return setting
 
@@ -221,12 +221,12 @@ class CRUDSetting(CRUDBase[Setting, dict, SettingUpdate]):
         Returns:
             Updated setting instance or None if not found
         """
-        setting =  self.get_by_tenant(db, tenant_id=tenant_id)
+        setting = self.get_by_tenant(db, tenant_id=tenant_id)
 
         if setting:
             setting.tax_rate = tax_rate
-             db.commit()
-             db.refresh(setting)
+            db.commit()
+            db.refresh(setting)
 
         return setting
 
@@ -246,7 +246,7 @@ class CRUDSetting(CRUDBase[Setting, dict, SettingUpdate]):
         Returns:
             Dictionary with currency information
         """
-        setting =  self.get_by_tenant(db, tenant_id=tenant_id)
+        setting = self.get_by_tenant(db, tenant_id=tenant_id)
 
         if setting:
             return {
@@ -278,7 +278,7 @@ class CRUDSetting(CRUDBase[Setting, dict, SettingUpdate]):
         Returns:
             Low stock threshold value (default: 5)
         """
-        setting =  self.get_by_tenant(db, tenant_id=tenant_id)
+        setting = self.get_by_tenant(db, tenant_id=tenant_id)
 
         if setting and setting.low_stock_threshold is not None:
             return setting.low_stock_threshold
@@ -301,7 +301,7 @@ class CRUDSetting(CRUDBase[Setting, dict, SettingUpdate]):
         Returns:
             Theme name (default: "light")
         """
-        setting =  self.get_by_tenant(db, tenant_id=tenant_id)
+        setting = self.get_by_tenant(db, tenant_id=tenant_id)
 
         if setting and setting.theme:
             return setting.theme

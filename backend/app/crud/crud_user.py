@@ -107,8 +107,8 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
 
         db_obj = User(**user_data)
         db.add(db_obj)
-         db.commit()
-         db.refresh(db_obj)
+        db.commit()
+        db.refresh(db_obj)
         return db_obj
 
     def update(
@@ -137,7 +137,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             update_data["password_hash"] = hashed_password
             del update_data["password"]
 
-        return  super().update(db, db_obj=db_obj, obj_in=update_data)
+        return super().update(db, db_obj=db_obj, obj_in=update_data)
 
     def get_users_by_role(
         self,
