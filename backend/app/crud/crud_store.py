@@ -6,7 +6,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from sqlalchemy import select, func, and_
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.crud.base import CRUDBase
 from app.models.store import Store
@@ -22,9 +22,9 @@ class CRUDStore(CRUDBase[Store, StoreCreate, StoreUpdate]):
     CRUD operations for Store model with multi-tenant support.
     """
 
-    async def get_by_name(
+    def get_by_name(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         name: str,
         tenant_id: Optional[UUID] = None
@@ -45,12 +45,12 @@ class CRUDStore(CRUDBase[Store, StoreCreate, StoreUpdate]):
         if tenant_id:
             query = query.where(Store.tenant_id == tenant_id)
 
-        result = await db.execute(query)
+        result =  db.execute(query)
         return result.scalar_one_or_none()
 
-    async def get_multi(
+    def get_multi(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         skip: int = 0,
         limit: int = 100,
@@ -82,12 +82,12 @@ class CRUDStore(CRUDBase[Store, StoreCreate, StoreUpdate]):
 
         query = query.offset(skip).limit(limit).order_by(Store.created_at.desc())
 
-        result = await db.execute(query)
+        result =  db.execute(query)
         return result.scalars().all()
 
-    async def get_active_stores(
+    def get_active_stores(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         tenant_id: Optional[UUID] = None,
         skip: int = 0,
@@ -112,12 +112,12 @@ class CRUDStore(CRUDBase[Store, StoreCreate, StoreUpdate]):
 
         query = query.offset(skip).limit(limit).order_by(Store.created_at.desc())
 
-        result = await db.execute(query)
+        result =  db.execute(query)
         return result.scalars().all()
 
-    async def search_stores(
+    def search_stores(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         search_term: str,
         tenant_id: Optional[UUID] = None,
@@ -149,12 +149,12 @@ class CRUDStore(CRUDBase[Store, StoreCreate, StoreUpdate]):
 
         query = query.offset(skip).limit(limit).order_by(Store.created_at.desc())
 
-        result = await db.execute(query)
+        result =  db.execute(query)
         return result.scalars().all()
 
-    async def name_exists(
+    def name_exists(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         name: str,
         tenant_id: Optional[UUID] = None,
@@ -180,13 +180,13 @@ class CRUDStore(CRUDBase[Store, StoreCreate, StoreUpdate]):
         if exclude_store_id:
             query = query.where(Store.id != exclude_store_id)
 
-        result = await db.execute(query)
+        result =  db.execute(query)
         count = result.scalar()
         return count > 0
 
-    async def get_store_statistics(
+    def get_store_statistics(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         store_id: UUID,
         tenant_id: Optional[UUID] = None
@@ -203,28 +203,28 @@ class CRUDStore(CRUDBase[Store, StoreCreate, StoreUpdate]):
             Dictionary with store statistics
         """
         # Verify store exists and belongs to tenant if tenant_id provided
-        store = await self.get(db, id=store_id, tenant_id=tenant_id)
+        store =  self.get(db, id=store_id, tenant_id=tenant_id)
         if not store:
             return {}
 
         # Product count
         product_query = select(func.count(Product.id)).where(Product.store_id == store_id)
-        product_result = await db.execute(product_query)
+        product_result =  db.execute(product_query)
         product_count = product_result.scalar() or 0
 
         # Customer count
         customer_query = select(func.count(Customer.id)).where(Customer.store_id == store_id)
-        customer_result = await db.execute(customer_query)
+        customer_result =  db.execute(customer_query)
         customer_count = customer_result.scalar() or 0
 
         # User count (cashiers assigned to this store)
         user_query = select(func.count(User.id)).where(User.store_id == store_id)
-        user_result = await db.execute(user_query)
+        user_result =  db.execute(user_query)
         user_count = user_result.scalar() or 0
 
         # Sales data
         sales_query = select(func.count(Sale.id)).where(Sale.store_id == store_id)
-        sales_result = await db.execute(sales_query)
+        sales_result =  db.execute(sales_query)
         total_sales = sales_result.scalar() or 0
 
         # Today's sales
@@ -236,7 +236,7 @@ class CRUDStore(CRUDBase[Store, StoreCreate, StoreUpdate]):
                 func.date(Sale.created_at) == today
             )
         )
-        today_sales_result = await db.execute(today_sales_query)
+        today_sales_result =  db.execute(today_sales_query)
         today_sales = today_sales_result.scalar() or 0
 
         # Total revenue (this would need to be calculated from sale_items)
@@ -246,7 +246,7 @@ class CRUDStore(CRUDBase[Store, StoreCreate, StoreUpdate]):
                 SaleItem.store_id == store_id
             )
         )
-        revenue_result = await db.execute(revenue_query)
+        revenue_result =  db.execute(revenue_query)
         total_revenue = float(revenue_result.scalar() or 0)
 
         # Today's revenue
@@ -256,7 +256,7 @@ class CRUDStore(CRUDBase[Store, StoreCreate, StoreUpdate]):
                 func.date(SaleItem.created_at) == today
             )
         )
-        today_revenue_result = await db.execute(today_revenue_query)
+        today_revenue_result =  db.execute(today_revenue_query)
         today_revenue = float(today_revenue_result.scalar() or 0)
 
         return {
@@ -272,9 +272,9 @@ class CRUDStore(CRUDBase[Store, StoreCreate, StoreUpdate]):
         }
 
     
-    async def update_status(
+    def update_status(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         store_id: UUID,
         status: str,
@@ -292,14 +292,14 @@ class CRUDStore(CRUDBase[Store, StoreCreate, StoreUpdate]):
         Returns:
             Updated store instance or None if not found
         """
-        store = await self.get(db, id=store_id, tenant_id=tenant_id)
+        store =  self.get(db, id=store_id, tenant_id=tenant_id)
         if not store:
             return None
 
         store.status = status
         db.add(store)
-        await db.commit()
-        await db.refresh(store)
+         db.commit()
+         db.refresh(store)
         return store
 
 

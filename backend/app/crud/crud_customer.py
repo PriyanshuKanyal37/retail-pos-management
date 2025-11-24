@@ -6,7 +6,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from sqlalchemy import select, func, and_
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.crud.base import CRUDBase
 from app.models.customer import Customer
@@ -18,9 +18,9 @@ class CRUDCustomer(CRUDBase[Customer, CustomerCreate, CustomerUpdate]):
     CRUD operations for Customer model with multi-tenant support.
     """
 
-    async def get_by_phone(
+    def get_by_phone(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         phone: str,
         tenant_id: UUID,
@@ -43,12 +43,12 @@ class CRUDCustomer(CRUDBase[Customer, CustomerCreate, CustomerUpdate]):
             conditions.append(Customer.store_id == store_id)
 
         query = select(Customer).where(and_(*conditions))
-        result = await db.execute(query)
+        result =  db.execute(query)
         return result.scalar_one_or_none()
 
-    async def phone_exists(
+    def phone_exists(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         phone: str,
         tenant_id: UUID,
@@ -77,13 +77,13 @@ class CRUDCustomer(CRUDBase[Customer, CustomerCreate, CustomerUpdate]):
         if exclude_customer_id:
             query = query.where(Customer.id != exclude_customer_id)
 
-        result = await db.execute(query)
+        result =  db.execute(query)
         count = result.scalar()
         return count > 0
 
-    async def search_customers(
+    def search_customers(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         search_term: str,
         tenant_id: UUID,
@@ -115,12 +115,12 @@ class CRUDCustomer(CRUDBase[Customer, CustomerCreate, CustomerUpdate]):
 
         query = select(Customer).where(and_(*conditions))
         query = query.offset(skip).limit(limit).order_by(Customer.created_at.desc())
-        result = await db.execute(query)
+        result =  db.execute(query)
         return result.scalars().all()
 
-    async def get_customers_by_store(
+    def get_customers_by_store(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         store_id: UUID,
         tenant_id: UUID,
@@ -144,12 +144,12 @@ class CRUDCustomer(CRUDBase[Customer, CustomerCreate, CustomerUpdate]):
 
         query = select(Customer).where(and_(*conditions))
         query = query.offset(skip).limit(limit).order_by(Customer.created_at.desc())
-        result = await db.execute(query)
+        result =  db.execute(query)
         return result.scalars().all()
 
-    async def get_recent_customers(
+    def get_recent_customers(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         tenant_id: UUID,
         days: int = 30,
@@ -178,12 +178,12 @@ class CRUDCustomer(CRUDBase[Customer, CustomerCreate, CustomerUpdate]):
         )
 
         query = query.limit(limit).order_by(Customer.created_at.desc())
-        result = await db.execute(query)
+        result =  db.execute(query)
         return result.scalars().all()
 
-    async def get_customers_with_sales_count(
+    def get_customers_with_sales_count(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         tenant_id: UUID,
         skip: int = 0,
@@ -217,7 +217,7 @@ class CRUDCustomer(CRUDBase[Customer, CustomerCreate, CustomerUpdate]):
             func.count(Sale.id).desc()
         ).offset(skip).limit(limit)
 
-        result = await db.execute(query)
+        result =  db.execute(query)
         customers_data = []
 
         for row in result:
@@ -230,9 +230,9 @@ class CRUDCustomer(CRUDBase[Customer, CustomerCreate, CustomerUpdate]):
 
         return customers_data
 
-    async def get_top_customers(
+    def get_top_customers(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         tenant_id: UUID,
         limit: int = 10
@@ -267,7 +267,7 @@ class CRUDCustomer(CRUDBase[Customer, CustomerCreate, CustomerUpdate]):
             func.sum(Sale.total).desc()
         ).limit(limit)
 
-        result = await db.execute(query)
+        result =  db.execute(query)
         top_customers = []
 
         for row in result:
@@ -280,9 +280,9 @@ class CRUDCustomer(CRUDBase[Customer, CustomerCreate, CustomerUpdate]):
 
         return top_customers
 
-    async def get_customer_statistics(
+    def get_customer_statistics(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         tenant_id: UUID
     ) -> dict:
@@ -300,7 +300,7 @@ class CRUDCustomer(CRUDBase[Customer, CustomerCreate, CustomerUpdate]):
 
         # Total customers
         total_query = select(func.count(Customer.id)).where(Customer.tenant_id == tenant_id)
-        total_result = await db.execute(total_query)
+        total_result =  db.execute(total_query)
         total_customers = total_result.scalar() or 0
 
         # Customers with sales
@@ -312,7 +312,7 @@ class CRUDCustomer(CRUDBase[Customer, CustomerCreate, CustomerUpdate]):
                 Sale.status == "completed"
             )
         )
-        customers_with_sales_result = await db.execute(customers_with_sales_query)
+        customers_with_sales_result =  db.execute(customers_with_sales_query)
         customers_with_sales = customers_with_sales_result.scalar() or 0
 
         # Customers without sales
@@ -327,7 +327,7 @@ class CRUDCustomer(CRUDBase[Customer, CustomerCreate, CustomerUpdate]):
                 Customer.created_at >= cutoff_date
             )
         )
-        recent_result = await db.execute(recent_query)
+        recent_result =  db.execute(recent_query)
         recent_customers = recent_result.scalar() or 0
 
         return {

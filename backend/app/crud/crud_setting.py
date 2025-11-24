@@ -6,7 +6,7 @@ from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.crud.base import CRUDBase
 from app.models.setting import Setting
@@ -18,9 +18,9 @@ class CRUDSetting(CRUDBase[Setting, dict, SettingUpdate]):
     CRUD operations for Setting model with multi-tenant support.
     """
 
-    async def get_by_tenant(
+    def get_by_tenant(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         tenant_id: UUID
     ) -> Optional[Setting]:
@@ -35,12 +35,12 @@ class CRUDSetting(CRUDBase[Setting, dict, SettingUpdate]):
             Setting instance or None if not found
         """
         query = select(Setting).where(Setting.tenant_id == tenant_id)
-        result = await db.execute(query)
+        result =  db.execute(query)
         return result.scalar_one_or_none()
 
-    async def create_or_update(
+    def create_or_update(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         tenant_id: UUID,
         setting_data: dict
@@ -57,20 +57,20 @@ class CRUDSetting(CRUDBase[Setting, dict, SettingUpdate]):
             Created or updated setting instance
         """
         # Try to get existing settings
-        existing_setting = await self.get_by_tenant(db, tenant_id=tenant_id)
+        existing_setting =  self.get_by_tenant(db, tenant_id=tenant_id)
 
         if existing_setting:
             # Update existing settings
             update_data = {k: v for k, v in setting_data.items() if v is not None}
-            return await self.update(db, db_obj=existing_setting, obj_in=update_data)
+            return  self.update(db, db_obj=existing_setting, obj_in=update_data)
         else:
             # Create new settings
             setting_data["tenant_id"] = tenant_id
-            return await self.create(db, obj_in=setting_data)
+            return  self.create(db, obj_in=setting_data)
 
-    async def update_theme(
+    def update_theme(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         tenant_id: UUID,
         theme: str
@@ -86,18 +86,18 @@ class CRUDSetting(CRUDBase[Setting, dict, SettingUpdate]):
         Returns:
             Updated setting instance or None if not found
         """
-        setting = await self.get_by_tenant(db, tenant_id=tenant_id)
+        setting =  self.get_by_tenant(db, tenant_id=tenant_id)
 
         if setting:
             setting.theme = theme
-            await db.commit()
-            await db.refresh(setting)
+             db.commit()
+             db.refresh(setting)
 
         return setting
 
-    async def update_low_stock_threshold(
+    def update_low_stock_threshold(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         tenant_id: UUID,
         threshold: int
@@ -113,18 +113,18 @@ class CRUDSetting(CRUDBase[Setting, dict, SettingUpdate]):
         Returns:
             Updated setting instance or None if not found
         """
-        setting = await self.get_by_tenant(db, tenant_id=tenant_id)
+        setting =  self.get_by_tenant(db, tenant_id=tenant_id)
 
         if setting:
             setting.low_stock_threshold = threshold
-            await db.commit()
-            await db.refresh(setting)
+             db.commit()
+             db.refresh(setting)
 
         return setting
 
-    async def update_store_info(
+    def update_store_info(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         tenant_id: UUID,
         store_name: str,
@@ -148,7 +148,7 @@ class CRUDSetting(CRUDBase[Setting, dict, SettingUpdate]):
         Returns:
             Updated setting instance or None if not found
         """
-        setting = await self.get_by_tenant(db, tenant_id=tenant_id)
+        setting =  self.get_by_tenant(db, tenant_id=tenant_id)
 
         if setting:
             setting.store_name = store_name
@@ -161,14 +161,14 @@ class CRUDSetting(CRUDBase[Setting, dict, SettingUpdate]):
             if store_logo_url is not None:
                 setting.store_logo_url = store_logo_url
 
-            await db.commit()
-            await db.refresh(setting)
+             db.commit()
+             db.refresh(setting)
 
         return setting
 
-    async def update_payment_settings(
+    def update_payment_settings(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         tenant_id: UUID,
         upi_id: Optional[str] = None,
@@ -188,7 +188,7 @@ class CRUDSetting(CRUDBase[Setting, dict, SettingUpdate]):
         Returns:
             Updated setting instance or None if not found
         """
-        setting = await self.get_by_tenant(db, tenant_id=tenant_id)
+        setting =  self.get_by_tenant(db, tenant_id=tenant_id)
 
         if setting:
             if upi_id is not None:
@@ -198,14 +198,14 @@ class CRUDSetting(CRUDBase[Setting, dict, SettingUpdate]):
             if currency_code is not None:
                 setting.currency_code = currency_code
 
-            await db.commit()
-            await db.refresh(setting)
+             db.commit()
+             db.refresh(setting)
 
         return setting
 
-    async def update_tax_rate(
+    def update_tax_rate(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         tenant_id: UUID,
         tax_rate: float
@@ -221,18 +221,18 @@ class CRUDSetting(CRUDBase[Setting, dict, SettingUpdate]):
         Returns:
             Updated setting instance or None if not found
         """
-        setting = await self.get_by_tenant(db, tenant_id=tenant_id)
+        setting =  self.get_by_tenant(db, tenant_id=tenant_id)
 
         if setting:
             setting.tax_rate = tax_rate
-            await db.commit()
-            await db.refresh(setting)
+             db.commit()
+             db.refresh(setting)
 
         return setting
 
-    async def get_tenant_currency_info(
+    def get_tenant_currency_info(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         tenant_id: UUID
     ) -> dict:
@@ -246,7 +246,7 @@ class CRUDSetting(CRUDBase[Setting, dict, SettingUpdate]):
         Returns:
             Dictionary with currency information
         """
-        setting = await self.get_by_tenant(db, tenant_id=tenant_id)
+        setting =  self.get_by_tenant(db, tenant_id=tenant_id)
 
         if setting:
             return {
@@ -262,9 +262,9 @@ class CRUDSetting(CRUDBase[Setting, dict, SettingUpdate]):
                 "tax_rate": 0.0,
             }
 
-    async def get_tenant_low_stock_threshold(
+    def get_tenant_low_stock_threshold(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         tenant_id: UUID
     ) -> int:
@@ -278,16 +278,16 @@ class CRUDSetting(CRUDBase[Setting, dict, SettingUpdate]):
         Returns:
             Low stock threshold value (default: 5)
         """
-        setting = await self.get_by_tenant(db, tenant_id=tenant_id)
+        setting =  self.get_by_tenant(db, tenant_id=tenant_id)
 
         if setting and setting.low_stock_threshold is not None:
             return setting.low_stock_threshold
 
         return 5  # Default threshold
 
-    async def get_tenant_theme(
+    def get_tenant_theme(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         tenant_id: UUID
     ) -> str:
@@ -301,7 +301,7 @@ class CRUDSetting(CRUDBase[Setting, dict, SettingUpdate]):
         Returns:
             Theme name (default: "light")
         """
-        setting = await self.get_by_tenant(db, tenant_id=tenant_id)
+        setting =  self.get_by_tenant(db, tenant_id=tenant_id)
 
         if setting and setting.theme:
             return setting.theme

@@ -6,7 +6,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from sqlalchemy import select, func, and_
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.crud.base import CRUDBase
 from app.models.user import User
@@ -19,9 +19,9 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
     CRUD operations for User model with multi-tenant support.
     """
 
-    async def get_by_email(
+    def get_by_email(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         email: str,
         tenant_id: Optional[UUID] = None
@@ -42,12 +42,12 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         if tenant_id:
             query = query.where(User.tenant_id == tenant_id)
 
-        result = await db.execute(query)
+        result =  db.execute(query)
         return result.scalar_one_or_none()
 
-    async def authenticate(
+    def authenticate(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         email: str,
         password: str,
@@ -65,7 +65,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         Returns:
             User instance if authentication successful, None otherwise
         """
-        user = await self.get_by_email(db, email=email, tenant_id=tenant_id)
+        user =  self.get_by_email(db, email=email, tenant_id=tenant_id)
         if not user:
             return None
 
@@ -74,9 +74,9 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
 
         return user
 
-    async def create(
+    def create(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         obj_in: UserCreate,
         tenant_id: UUID
@@ -107,13 +107,13 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
 
         db_obj = User(**user_data)
         db.add(db_obj)
-        await db.commit()
-        await db.refresh(db_obj)
+         db.commit()
+         db.refresh(db_obj)
         return db_obj
 
-    async def update(
+    def update(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         db_obj: User,
         obj_in: UserUpdate
@@ -137,11 +137,11 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             update_data["password_hash"] = hashed_password
             del update_data["password"]
 
-        return await super().update(db, db_obj=db_obj, obj_in=update_data)
+        return  super().update(db, db_obj=db_obj, obj_in=update_data)
 
-    async def get_users_by_role(
+    def get_users_by_role(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         role: str,
         tenant_id: Optional[UUID] = None,
@@ -167,12 +167,12 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             query = query.where(User.tenant_id == tenant_id)
 
         query = query.offset(skip).limit(limit).order_by(User.created_at.desc())
-        result = await db.execute(query)
+        result =  db.execute(query)
         return result.scalars().all()
 
-    async def get_active_users(
+    def get_active_users(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         tenant_id: Optional[UUID] = None,
         skip: int = 0,
@@ -196,12 +196,12 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             query = query.where(User.tenant_id == tenant_id)
 
         query = query.offset(skip).limit(limit).order_by(User.created_at.desc())
-        result = await db.execute(query)
+        result =  db.execute(query)
         return result.scalars().all()
 
-    async def search_users(
+    def search_users(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         search_term: str,
         tenant_id: Optional[UUID] = None,
@@ -232,12 +232,12 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             query = query.where(User.tenant_id == tenant_id)
 
         query = query.offset(skip).limit(limit).order_by(User.created_at.desc())
-        result = await db.execute(query)
+        result =  db.execute(query)
         return result.scalars().all()
 
-    async def email_exists(
+    def email_exists(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         email: str,
         tenant_id: Optional[UUID] = None,
@@ -263,13 +263,13 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         if exclude_user_id:
             query = query.where(User.id != exclude_user_id)
 
-        result = await db.execute(query)
+        result =  db.execute(query)
         count = result.scalar()
         return count > 0
 
-    async def get_user_statistics(
+    def get_user_statistics(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         tenant_id: Optional[UUID] = None
     ) -> dict:
@@ -290,7 +290,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         if tenant_id:
             total_query = total_query.where(User.tenant_id == tenant_id)
 
-        total_result = await db.execute(total_query)
+        total_result =  db.execute(total_query)
         total_users = total_result.scalar() or 0
 
         # Active users
@@ -298,7 +298,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         if tenant_id:
             active_query = active_query.where(User.tenant_id == tenant_id)
 
-        active_result = await db.execute(active_query)
+        active_result =  db.execute(active_query)
         active_users = active_result.scalar() or 0
 
         # Super Admin users
@@ -306,7 +306,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         if tenant_id:
             admin_query = admin_query.where(User.tenant_id == tenant_id)
 
-        admin_result = await db.execute(admin_query)
+        admin_result =  db.execute(admin_query)
         admin_users = admin_result.scalar() or 0
 
         # Manager users
@@ -314,7 +314,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         if tenant_id:
             manager_query = manager_query.where(User.tenant_id == tenant_id)
 
-        manager_result = await db.execute(manager_query)
+        manager_result =  db.execute(manager_query)
         manager_users = manager_result.scalar() or 0
 
         # Cashier users
@@ -322,7 +322,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         if tenant_id:
             cashier_query = cashier_query.where(User.tenant_id == tenant_id)
 
-        cashier_result = await db.execute(cashier_query)
+        cashier_result =  db.execute(cashier_query)
         cashier_users = cashier_result.scalar() or 0
 
         return {

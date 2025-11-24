@@ -6,7 +6,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.crud.base import CRUDBase
 from app.models.tenant import Tenant
@@ -18,9 +18,9 @@ class CRUDTenant(CRUDBase[Tenant, TenantCreate, TenantUpdate]):
     CRUD operations for Tenant model.
     """
 
-    async def get_by_domain(
+    def get_by_domain(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         domain: str
     ) -> Optional[Tenant]:
@@ -35,12 +35,12 @@ class CRUDTenant(CRUDBase[Tenant, TenantCreate, TenantUpdate]):
             Tenant instance or None if not found
         """
         query = select(Tenant).where(Tenant.domain == domain)
-        result = await db.execute(query)
+        result =  db.execute(query)
         return result.scalar_one_or_none()
 
-    async def get_by_name(
+    def get_by_name(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         name: str
     ) -> Optional[Tenant]:
@@ -55,12 +55,12 @@ class CRUDTenant(CRUDBase[Tenant, TenantCreate, TenantUpdate]):
             Tenant instance or None if not found
         """
         query = select(Tenant).where(Tenant.name == name)
-        result = await db.execute(query)
+        result =  db.execute(query)
         return result.scalar_one_or_none()
 
-    async def get_active_tenants(
+    def get_active_tenants(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         skip: int = 0,
         limit: int = 100
@@ -78,12 +78,12 @@ class CRUDTenant(CRUDBase[Tenant, TenantCreate, TenantUpdate]):
         """
         query = select(Tenant).where(Tenant.status == "active").offset(skip).limit(limit)
         query = query.order_by(Tenant.created_at.desc())
-        result = await db.execute(query)
+        result =  db.execute(query)
         return result.scalars().all()
 
-    async def get_statistics(
+    def get_statistics(
         self,
-        db: AsyncSession,
+        db: Session,
         *,
         tenant_id: UUID
     ) -> dict:
@@ -103,13 +103,13 @@ class CRUDTenant(CRUDBase[Tenant, TenantCreate, TenantUpdate]):
         from app.models.sale import Sale
 
         # Get tenant info
-        tenant = await self.get(db, id=tenant_id)
+        tenant =  self.get(db, id=tenant_id)
         if not tenant:
             return {}
 
         # Count users
         user_count_query = select(func.count(User.id)).where(User.tenant_id == tenant_id)
-        user_count_result = await db.execute(user_count_query)
+        user_count_result =  db.execute(user_count_query)
         total_users = user_count_result.scalar() or 0
 
         # Count active users
@@ -117,12 +117,12 @@ class CRUDTenant(CRUDBase[Tenant, TenantCreate, TenantUpdate]):
             User.tenant_id == tenant_id,
             User.status == "active"
         )
-        active_user_count_result = await db.execute(active_user_count_query)
+        active_user_count_result =  db.execute(active_user_count_query)
         active_users = active_user_count_result.scalar() or 0
 
         # Count products
         product_count_query = select(func.count(Product.id)).where(Product.tenant_id == tenant_id)
-        product_count_result = await db.execute(product_count_query)
+        product_count_result =  db.execute(product_count_query)
         total_products = product_count_result.scalar() or 0
 
         # Count active products
@@ -130,22 +130,22 @@ class CRUDTenant(CRUDBase[Tenant, TenantCreate, TenantUpdate]):
             Product.tenant_id == tenant_id,
             Product.status == "active"
         )
-        active_product_count_result = await db.execute(active_product_count_query)
+        active_product_count_result =  db.execute(active_product_count_query)
         active_products = active_product_count_result.scalar() or 0
 
         # Count customers
         customer_count_query = select(func.count(Customer.id)).where(Customer.tenant_id == tenant_id)
-        customer_count_result = await db.execute(customer_count_query)
+        customer_count_result =  db.execute(customer_count_query)
         total_customers = customer_count_result.scalar() or 0
 
         # Count sales
         sale_count_query = select(func.count(Sale.id)).where(Sale.tenant_id == tenant_id)
-        sale_count_result = await db.execute(sale_count_query)
+        sale_count_result =  db.execute(sale_count_query)
         total_sales = sale_count_result.scalar() or 0
 
         # Sum total revenue
         revenue_query = select(func.sum(Sale.total)).where(Sale.tenant_id == tenant_id)
-        revenue_result = await db.execute(revenue_query)
+        revenue_result =  db.execute(revenue_query)
         total_revenue = revenue_result.scalar() or 0
 
         return {
