@@ -32,7 +32,7 @@ const useAuthStore = create(
           });
 
           const data = response?.data ?? response ?? {};
-          const accessToken = data.access_token || data.token;
+          const accessToken = data?.access_token;
 
           // Store JWT token securely (signup now returns access_token)
           if (!accessToken || !tokenManager.setToken(accessToken)) {
@@ -99,7 +99,7 @@ const useAuthStore = create(
           const response = await api.auth.login(email, password);
 
           const data = response?.data ?? response ?? {};
-          const accessToken = data.access_token || data.token;
+          const accessToken = data?.access_token;
 
           // Store JWT token securely (login returns access_token)
           if (!accessToken || !tokenManager.setToken(accessToken)) {
