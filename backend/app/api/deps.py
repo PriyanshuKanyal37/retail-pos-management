@@ -4,20 +4,24 @@ from uuid import UUID
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.security import decode_token, get_tenant_id_from_token
-from app.db.session import get_db
+from app.db.session import AsyncSessionAdapter, SessionLocal
 from app.models.user import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.api_prefix}/auth/login")
 
 
-async def get_db_session() -> AsyncSession:
-    async for session in get_db():
-        yield session
+async def get_db_session():
+    db = SessionLocal()
+    adapter = AsyncSessionAdapter(db)
+    try:
+        yield adapter
+    finally:
+        await adapter.close()
 
 
 async def get_current_user_with_tenant(

@@ -24,8 +24,8 @@ async def lifespan(app: FastAPI):
 
     # Try database connection but don't fail startup if it's not available
     try:
-        async with engine.begin() as conn:
-            await conn.execute(text("SELECT 1"))
+        with engine.begin() as conn:
+            conn.execute(text("SELECT 1"))
         logger.info("Database connection established successfully")
     except Exception as e:
         logger.warning(f"Database connection failed: {str(e)}")
@@ -46,7 +46,7 @@ async def lifespan(app: FastAPI):
 
     logger.info("FA POS application shutting down...", extra={'action': 'application_shutdown'})
     try:
-        await engine.dispose()
+        engine.dispose()
         logger.info("Database connections closed")
     except Exception as e:
         logger.warning(f"Error during database shutdown: {str(e)}")
@@ -241,8 +241,8 @@ def create_application() -> FastAPI:
 
         # Check database connection
         try:
-            async with engine.begin() as conn:
-                await conn.execute(text("SELECT 1"))
+            with engine.begin() as conn:
+                conn.execute(text("SELECT 1"))
             health_status["database"] = "connected"
         except Exception as e:
             logger.warning(f"Database health check failed: {str(e)}")
