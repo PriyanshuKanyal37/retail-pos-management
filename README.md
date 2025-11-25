@@ -1,4 +1,4 @@
-# 🛒 FA POS - FastAPI & React Point of Sale System
+# 🛒 Retail POS - FastAPI & React Point of Sale System
 
 <div align="center">
   <img src="https://img.shields.io/badge/FastAPI-0.104.1-009688?style=for-the-badge&logo=fastapi" alt="FastAPI">
@@ -541,7 +541,7 @@ We welcome contributions! Please follow these steps:
 # 1. Verify PostgreSQL is running
 # 2. Check .env database URL
 # 3. Ensure database exists
-psql -h localhost -U postgres -c "CREATE DATABASE fapos;"
+psql -h localhost -U postgres -c "CREATE DATABASE retail_pos;"
 ```
 
 **Problem**: JWT token not working
