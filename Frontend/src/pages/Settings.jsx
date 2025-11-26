@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import useSettingsStore from '../stores/settingsStore';
 import useUIStore from '../stores/uiStore';
+import useAuthStore from '../stores/authStore';
 
 const themeOptions = [
   { label: 'Light Mode', value: 'light', description: 'Bright interface for well-lit environments.' },
@@ -26,8 +27,21 @@ const Settings = () => {
   const updateSettings = useSettingsStore((state) => state.updateSettings);
   const setTheme = useSettingsStore((state) => state.setTheme);
   const showAlert = useUIStore((state) => state.showAlert);
+  const role = useAuthStore((state) => state.role);
+
+  const isSuperAdmin = role === 'super_admin';
+  const isManager = role === 'manager';
+  const isCashier = role === 'cashier';
+  const showAdvancedSettings = isManager;
+  const showPasswordSection = isSuperAdmin || isManager || isCashier;
+  const showAppearanceSection = false;
 
   const [formData, setFormData] = useState(settings ?? initialSettings);
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
   const isDirty = useMemo(() => {
     if (!settings) {
       return false;
@@ -80,6 +94,34 @@ const Settings = () => {
     showAlert('success', `Theme switched to ${value === 'dark' ? 'Dark' : 'Light'} mode`);
   };
 
+  const handlePasswordInput = (event) => {
+    const { name, value } = event.target;
+    setPasswordForm((prev) => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handlePasswordUpdate = (event) => {
+    event.preventDefault();
+
+    if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
+      showAlert('error', 'Please fill in all password fields');
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      showAlert('error', 'New password and confirmation do not match');
+      return;
+    }
+
+    showAlert(
+      'info',
+      'Password reset request noted. Please contact your administrator to complete the change.'
+    );
+    setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     try {
@@ -127,16 +169,20 @@ const Settings = () => {
       <form id="settings-form" onSubmit={handleSubmit} className="mt-6 space-y-6">
         <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
           <div className="border-b border-gray-200 pb-4 dark:border-gray-700">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Store Information</h2>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {isManager ? 'Store Information' : 'Profile'}
+            </h2>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Details shown on invoices and customer communications.
+              {isManager
+                ? 'Details shown on invoices and customer communications.'
+                : 'Update the information that appears on receipts and notifications.'}
             </p>
           </div>
 
           <div className="mt-6 grid gap-5 lg:grid-cols-2">
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Store Name *
+                {isManager ? 'Store Name *' : 'Full Name *'}
               </label>
               <input
                 type="text"
@@ -149,7 +195,7 @@ const Settings = () => {
 
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Contact Email
+                Email Address
               </label>
               <input
                 type="email"
@@ -173,133 +219,197 @@ const Settings = () => {
               />
             </div>
 
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Store Address
-              </label>
-              <textarea
-                name="storeAddress"
-                value={formData.storeAddress}
-                onChange={handleInputChange}
-                rows={3}
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              />
-            </div>
+            {isManager && (
+              <div className="lg:col-span-2">
+                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Store Address
+                </label>
+                <textarea
+                  name="storeAddress"
+                  value={formData.storeAddress}
+                  onChange={handleInputChange}
+                  rows={3}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                />
+              </div>
+            )}
           </div>
         </section>
 
-        <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-          <div className="border-b border-gray-200 pb-4 dark:border-gray-700">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">POS Configuration</h2>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Adjust taxation, currency display and stock alerts.
-            </p>
-          </div>
-          <div className="mt-6 grid gap-5 lg:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Tax Rate (%)
-              </label>
-              <input
-                type="number"
-                name="taxRate"
-                min={0}
-                step="0.01"
-                value={formData.taxRate}
-                onChange={handleNumberChange}
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              />
+        {showAdvancedSettings && (
+          <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <div className="border-b border-gray-200 pb-4 dark:border-gray-700">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">POS Configuration</h2>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Adjust taxation, currency display and stock alerts.
+              </p>
             </div>
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Currency Symbol
-              </label>
-              <input
-                type="text"
-                name="currencySymbol"
-                maxLength={3}
-                value={formData.currencySymbol}
-                onChange={handleInputChange}
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              />
+            <div className="mt-6 grid gap-5 lg:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Tax Rate (%)
+                </label>
+                <input
+                  type="number"
+                  name="taxRate"
+                  min={0}
+                  step="0.01"
+                  value={formData.taxRate}
+                  onChange={handleNumberChange}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Currency Symbol
+                </label>
+                <input
+                  type="text"
+                  name="currencySymbol"
+                  maxLength={3}
+                  value={formData.currencySymbol}
+                  onChange={handleInputChange}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Currency Code
+                </label>
+                <input
+                  type="text"
+                  name="currencyCode"
+                  maxLength={5}
+                  value={formData.currencyCode}
+                  onChange={handleInputChange}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Low Stock Threshold
+                </label>
+                <input
+                  type="number"
+                  name="lowStockThreshold"
+                  min={0}
+                  value={formData.lowStockThreshold}
+                  onChange={handleNumberChange}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                />
+              </div>
             </div>
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Currency Code
-              </label>
-              <input
-                type="text"
-                name="currencyCode"
-                maxLength={5}
-                value={formData.currencyCode}
-                onChange={handleInputChange}
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Low Stock Threshold
-              </label>
-              <input
-                type="number"
-                name="lowStockThreshold"
-                min={0}
-                value={formData.lowStockThreshold}
-                onChange={handleNumberChange}
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              />
-            </div>
-          </div>
-        </section>
+          </section>
+        )}
 
-        <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-          <div className="border-b border-gray-200 pb-4 dark:border-gray-700">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Appearance</h2>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Select the default theme for all users. They can still toggle it from the sidebar.
-            </p>
-          </div>
+        {showPasswordSection && (
+          <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <div className="border-b border-gray-200 pb-4 dark:border-gray-700">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Password Reset</h2>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Update your password to keep your account secure.
+              </p>
+            </div>
+            <div className="mt-6 grid gap-5 lg:grid-cols-3">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Current Password
+                </label>
+                <input
+                  type="password"
+                  name="currentPassword"
+                  value={passwordForm.currentPassword}
+                  onChange={handlePasswordInput}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  New Password
+                </label>
+                <input
+                  type="password"
+                  name="newPassword"
+                  value={passwordForm.newPassword}
+                  onChange={handlePasswordInput}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Confirm Password
+                </label>
+                <input
+                  type="password"
+                  name="confirmPassword"
+                  value={passwordForm.confirmPassword}
+                  onChange={handlePasswordInput}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                />
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={handlePasswordUpdate}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+              >
+                Reset Password
+              </button>
+            </div>
+          </section>
+        )}
 
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            {themeOptions.map((option) => {
-              const isActive = formData.theme === option.value;
-              return (
-                <button
-                  type="button"
-                  key={option.value}
-                  onClick={() => handleThemeChange(option.value)}
-                  className={`rounded-xl border px-4 py-4 text-left transition ${
-                    isActive
-                      ? 'border-blue-600 bg-blue-50 dark:border-blue-500 dark:bg-blue-900/30'
-                      : 'border-gray-300 hover:border-blue-400 dark:border-gray-600 dark:hover:border-blue-400'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900 dark:text-white">{option.label}</p>
-                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{option.description}</p>
+        {showAppearanceSection && (
+          <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <div className="border-b border-gray-200 pb-4 dark:border-gray-700">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Appearance</h2>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Select the default theme for all users. They can still toggle it from the sidebar.
+              </p>
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              {themeOptions.map((option) => {
+                const isActive = formData.theme === option.value;
+                return (
+                  <button
+                    type="button"
+                    key={option.value}
+                    onClick={() => handleThemeChange(option.value)}
+                    className={`rounded-xl border px-4 py-4 text-left transition ${
+                      isActive
+                        ? 'border-blue-600 bg-blue-50 dark:border-blue-500 dark:bg-blue-900/30'
+                        : 'border-gray-300 hover:border-blue-400 dark:border-gray-600 dark:hover:border-blue-400'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white">{option.label}</p>
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{option.description}</p>
+                      </div>
+                      <span
+                        className={`inline-flex h-6 w-6 items-center justify-center rounded-full border ${
+                          isActive
+                            ? 'border-blue-600 bg-blue-600 text-white'
+                            : 'border-gray-300 text-gray-400 dark:border-gray-500'
+                        }`}
+                      >
+                        {isActive ? (
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : (
+                          <span className="block h-3 w-3 rounded-full bg-transparent" />
+                        )}
+                      </span>
                     </div>
-                    <span
-                      className={`inline-flex h-6 w-6 items-center justify-center rounded-full border ${
-                        isActive
-                          ? 'border-blue-600 bg-blue-600 text-white'
-                          : 'border-gray-300 text-gray-400 dark:border-gray-500'
-                      }`}
-                    >
-                      {isActive ? (
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      ) : (
-                        <span className="block h-3 w-3 rounded-full bg-transparent" />
-                      )}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </section>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
       </form>
     </div>
   );
