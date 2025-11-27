@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import useUIStore from '../../stores/uiStore';
 import useSettingsStore from '../../stores/settingsStore';
+import api from '../../api/client-updated';
 
 const PaymentStatusChecker = ({
   saleId,
@@ -64,28 +65,15 @@ const PaymentStatusChecker = ({
         setStatus('checking');
         setAttempts(prev => prev + 1);
 
-        // Check payment status - this would need to be implemented in your backend
-        const response = await fetch(`/api/v1/sales/${saleId}/payment-status`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('auth-token')}`
-          }
-        });
+        const data = await api.razorpay.getOrderStatus(saleId);
 
-        if (!response.ok) {
-          throw new Error('Failed to check payment status');
-        }
-
-        const data = await response.json();
-
-        if (data.status === 'completed') {
+        if (['captured', 'paid'].includes(data.status)) {
           setStatus('received');
           if (onPaymentReceived) {
             onPaymentReceived(data);
           }
           showAlert('success', `Payment of ${currency}${amount} received successfully!`);
-        } else if (data.status === 'failed') {
+        } else if (['failed', 'refunded'].includes(data.status)) {
           setStatus('error');
           showAlert('error', 'Payment failed. Please try again.');
         } else {
@@ -101,7 +89,7 @@ const PaymentStatusChecker = ({
       clearInterval(checkTimer);
       clearInterval(timerTimer);
     };
-  }, [status, attempts, saleId, amount, onPaymentReceived, onTimeout, showAlert, maxAttempts, timeoutSeconds]);
+  }, [status, attempts, saleId, amount, onPaymentReceived, onTimeout, showAlert, maxAttempts, timeoutSeconds, currency]);
 
   const getStatusColor = () => {
     switch (status) {

@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
 
+    razorpay_enable_validation: bool = True
+
     def cors_origins_for_fastapi(self) -> List[str]:
         return self.frontend_origins
 

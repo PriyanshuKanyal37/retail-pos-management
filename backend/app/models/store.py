@@ -10,6 +10,8 @@ from app.db.base_class import Base
 
 if TYPE_CHECKING:
     from app.models.user import User
+    from app.models.razorpay_connection import RazorpayConnection
+    from app.models.razorpay_payment import RazorpayPayment
 
 
 class Store(Base):
@@ -31,6 +33,16 @@ class Store(Base):
     customers = relationship("Customer", back_populates="store", cascade="all, delete-orphan")
     sales = relationship("Sale", back_populates="store", cascade="all, delete-orphan")
     settings = relationship("Setting", back_populates="store", cascade="all, delete-orphan")
+    razorpay_connections = relationship(
+        "RazorpayConnection",
+        back_populates="store",
+        cascade="all, delete-orphan"
+    )
+    razorpay_payments = relationship(
+        "RazorpayPayment",
+        back_populates="store",
+        cascade="all, delete-orphan"
+    )
     users = relationship("User", foreign_keys="User.store_id", back_populates="store")
 
     def __repr__(self):

@@ -5,10 +5,40 @@ import useCustomerStore from '../../stores/customerStore';
 import useProductStore from '../../stores/productStore';
 import useSalesStore from '../../stores/salesStore';
 import useSettingsStore from '../../stores/settingsStore';
+import useRazorpayStore from '../../stores/razorpayStore';
 import useUIStore from '../../stores/uiStore';
 import { openInvoicePrintWindow } from '../../utils/invoice';
 import UPIQRCode from './UPIQRCode';
 import PaymentStatusChecker from './PaymentStatusChecker';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_PREFIX = '/api/v1';
+const RAZORPAY_SCRIPT_ID = 'razorpay-checkout-js';
+
+const loadRazorpayScript = () => new Promise((resolve, reject) => {
+  if (typeof window === 'undefined') {
+    reject(new Error('Window is not available'));
+    return;
+  }
+
+  const existingScript = document.getElementById(RAZORPAY_SCRIPT_ID);
+  if (existingScript) {
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+    existingScript.addEventListener('load', () => resolve(true), { once: true });
+    existingScript.addEventListener('error', () => reject(new Error('Failed to load Razorpay SDK')), { once: true });
+    return;
+  }
+
+  const script = document.createElement('script');
+  script.id = RAZORPAY_SCRIPT_ID;
+  script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+  script.onload = () => resolve(true);
+  script.onerror = () => reject(new Error('Failed to load Razorpay SDK'));
+  document.body.appendChild(script);
+});
 
 const PaymentModal = () => {
   const activeModal = useUIStore((state) => state.activeModal);
@@ -41,6 +71,10 @@ const PaymentModal = () => {
   const settings = useSettingsStore((state) => state.settings);
   const currency = settings?.currency ?? settings?.currencySymbol ?? 'Rs.';
   const taxRate = settings?.taxRate ?? 0;
+  const razorpayStatus = useRazorpayStore((state) => state.status);
+  const fetchRazorpayStatus = useRazorpayStore((state) => state.fetchStatus);
+  const createRazorpayOrder = useRazorpayStore((state) => state.createOrderForSale);
+  const razorpayLoading = useRazorpayStore((state) => state.isLoading);
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [completedSale, setCompletedSale] = useState(null);
@@ -49,6 +83,9 @@ const PaymentModal = () => {
   const [pendingInvoiceNumber, setPendingInvoiceNumber] = useState('INV-XXXX-XXXX');
   const [upiPaymentStep, setUpiPaymentStep] = useState('init'); // 'init', 'qr', 'processing', 'completed'
   const [pendingSaleId, setPendingSaleId] = useState(null);
+  const [razorpayOrder, setRazorpayOrder] = useState(null);
+  const [razorpayCheckoutError, setRazorpayCheckoutError] = useState('');
+  const [isLaunchingRazorpay, setIsLaunchingRazorpay] = useState(false);
   const customerNameRef = useRef(null);
   const customerPhoneRef = useRef(null);
 
@@ -67,6 +104,7 @@ const PaymentModal = () => {
   const discountAmount = getDiscountAmount();
   const tax = getTax(taxRate);
   const grandTotal = getGrandTotal(taxRate);
+  const isRazorpayConnected = Boolean(razorpayStatus?.isConnected);
 
   useEffect(() => {
     if (selectedCustomer) {
@@ -92,11 +130,20 @@ const PaymentModal = () => {
   }, [activeModal, selectedCustomer]);
 
   useEffect(() => {
+    if (activeModal === 'payment') {
+      fetchRazorpayStatus().catch(() => {});
+    }
+  }, [activeModal, fetchRazorpayStatus]);
+
+  useEffect(() => {
     if (activeModal !== 'payment') {
       setIsProcessing(false);
       setCompletedSale(null);
       setUpiPaymentStep('init');
       setPendingSaleId(null);
+      setRazorpayOrder(null);
+      setRazorpayCheckoutError('');
+      setIsLaunchingRazorpay(false);
       return;
     }
 
@@ -129,6 +176,12 @@ const PaymentModal = () => {
     showAlert
   ]);
 
+  useEffect(() => {
+    if (!isRazorpayConnected) {
+      setRazorpayOrder(null);
+    }
+  }, [isRazorpayConnected]);
+
   const handleCustomerFormChange = (field) => (event) => {
     let { value } = event.target;
 
@@ -151,6 +204,93 @@ const PaymentModal = () => {
     if (event.key === 'Enter') {
       event.preventDefault();
       customerPhoneRef.current?.focus();
+    }
+  };
+
+  const launchRazorpayCheckout = async (order, customer) => {
+    setIsLaunchingRazorpay(true);
+    setRazorpayCheckoutError('');
+    try {
+      await loadRazorpayScript();
+      if (!window.Razorpay) {
+        throw new Error('Razorpay SDK unavailable');
+      }
+      const checkout = new window.Razorpay({
+        key: order.keyId,
+        amount: order.amount,
+        currency: order.currency,
+        name: settings?.storeName || 'FA POS Store',
+        description: `Invoice ${pendingInvoiceNumber}`,
+        order_id: order.orderId,
+        callback_url: `${API_BASE_URL}${API_PREFIX}/razorpay/callback`,
+        redirect: true,
+        notes: {
+          sale_id: pendingSaleId ?? '',
+          customer_name: customer?.name || 'Walk-in Customer'
+        },
+        prefill: {
+          name: customer?.name || '',
+          contact: customer?.phone || ''
+        },
+        method: {
+          upi: true,
+          card: true,
+          netbanking: true,
+          wallet: true,
+          paylater: true
+        },
+        config: {
+          display: {
+            blocks: {
+              upi_qr_block: {
+                name: 'Scan & Pay via UPI',
+                instruments: [
+                  {
+                    method: 'upi',
+                    type: 'qr'
+                  },
+                  {
+                    method: 'upi'
+                  }
+                ]
+              }
+            },
+            sequence: ['upi_qr_block', 'card', 'netbanking', 'wallet', 'paylater'],
+            preferences: {
+              show_default_blocks: true
+            }
+          },
+          upi: {
+            flow: 'qr',
+            mode: 'qr',
+            active: true,
+            max_amount: order.amount
+          }
+        },
+        theme: {
+          color: '#2563eb'
+        }
+      });
+      checkout.open();
+    } catch (error) {
+      setRazorpayCheckoutError(error.message || 'Failed to open Razorpay Checkout');
+      throw error;
+    } finally {
+      setIsLaunchingRazorpay(false);
+    }
+  };
+
+  const handleLaunchRazorpayCheckout = async () => {
+    if (!razorpayOrder) {
+      showAlert('error', 'Razorpay order is not ready yet.');
+      return;
+    }
+
+    try {
+      await launchRazorpayCheckout(razorpayOrder, selectedCustomer);
+      showAlert('info', 'Razorpay Checkout opened. Complete payment in the popup.');
+    } catch (error) {
+      showAlert('error', error.message || 'Unable to launch Razorpay Checkout');
     }
   };
 
@@ -263,8 +403,31 @@ const PaymentModal = () => {
       });
 
       setPendingSaleId(saleResult.id);
+      setPendingInvoiceNumber(saleResult.invoice_no || pendingInvoiceNumber);
+      setRazorpayCheckoutError('');
+
+      if (isRazorpayConnected) {
+        try {
+          const order = await createRazorpayOrder({
+            saleId: saleResult.id,
+            amountOverridePaise: Math.round(grandTotal * 100),
+            receipt: saleResult.invoice_no || pendingInvoiceNumber
+          });
+          setRazorpayOrder(order);
+          await launchRazorpayCheckout(order, customerRecord);
+          showAlert('info', 'Razorpay Checkout launched. Awaiting confirmation.');
+        } catch (orderError) {
+          console.error('Failed to initialize Razorpay order:', orderError);
+          setRazorpayOrder(null);
+          setRazorpayCheckoutError(orderError.message || 'Unable to initialize Razorpay');
+          showAlert('error', 'Unable to connect to Razorpay. Showing manual UPI QR as fallback.');
+        }
+      } else {
+        setRazorpayOrder(null);
+        showAlert('success', 'Sale created! Please scan QR code to complete payment.');
+      }
+
       setUpiPaymentStep('qr');
-      showAlert('success', 'Sale created! Please scan QR code to complete payment.');
 
     } catch (error) {
       console.error('UPI transaction initiation failed:', error);
@@ -663,21 +826,76 @@ const PaymentModal = () => {
                       <h3 className="mb-4 text-sm font-semibold text-gray-700 dark:text-gray-300">
                         UPI Payment
                       </h3>
-                      <UPIQRCode
-                        upiId={settings?.upiId || 'default@upi'}
-                        amount={grandTotal}
-                        merchantName={settings?.storeName || 'FA POS Store'}
-                        transactionNote={`Invoice ${pendingInvoiceNumber}`}
-                        onCancel={() => setUpiPaymentStep('init')}
-                      />
+                      {isRazorpayConnected ? (
+                        <div className="space-y-4">
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Razorpay Checkout handles the UPI payment request. If the popup closed, you can reopen it below.
+                          </p>
+                          {razorpayOrder ? (
+                            <div className="rounded-lg border border-gray-200 p-4 dark:border-gray-600">
+                              <dl className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
+                                <div className="flex justify-between">
+                                  <dt>Order ID</dt>
+                                  <dd className="font-mono text-xs">{razorpayOrder.orderId}</dd>
+                                </div>
+                                <div className="flex justify-between">
+                                  <dt>Amount</dt>
+                                  <dd className="font-medium text-gray-900 dark:text-white">
+                                    {currency}
+                                    {(razorpayOrder.amount / 100).toFixed(2)}
+                                  </dd>
+                                </div>
+                                <div className="flex justify-between">
+                                  <dt>Receipt</dt>
+                                  <dd>{razorpayOrder.receipt || 'N/A'}</dd>
+                                </div>
+                              </dl>
+                              <button
+                                type="button"
+                                onClick={handleLaunchRazorpayCheckout}
+                                disabled={isLaunchingRazorpay}
+                                className="mt-4 w-full rounded-lg bg-blue-600 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {isLaunchingRazorpay ? 'Opening Razorpay...' : 'Open Razorpay Checkout'}
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="rounded-lg bg-yellow-50 p-4 text-sm text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300">
+                              Unable to create a Razorpay order. You can cancel and choose another payment method or try again.
+                            </div>
+                          )}
+                          {razorpayCheckoutError && (
+                            <p className="text-sm text-red-600 dark:text-red-400">{razorpayCheckoutError}</p>
+                          )}
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                            Razorpay is not connected for this store. Use the QR code below with your preferred UPI app.
+                          </p>
+                          <UPIQRCode
+                            upiId={settings?.upiId || 'default@upi'}
+                            amount={grandTotal}
+                            merchantName={settings?.storeName || 'FA POS Store'}
+                            transactionNote={`Invoice ${pendingInvoiceNumber}`}
+                            onCancel={() => setUpiPaymentStep('init')}
+                          />
+                        </>
+                      )}
                     </div>
 
-                    <PaymentStatusChecker
-                      saleId={pendingSaleId}
-                      amount={grandTotal}
-                      onPaymentReceived={handleUPIPaymentReceived}
-                      onTimeout={handleUPIPaymentTimeout}
-                    />
+                    {isRazorpayConnected && pendingSaleId ? (
+                      <PaymentStatusChecker
+                        saleId={pendingSaleId}
+                        amount={grandTotal}
+                        onPaymentReceived={handleUPIPaymentReceived}
+                        onTimeout={handleUPIPaymentTimeout}
+                      />
+                    ) : (
+                      <div className="rounded-lg bg-yellow-50 p-4 text-sm text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300">
+                        After the customer pays using the QR code, mark the sale as paid manually from the Sales screen.
+                      </div>
+                    )}
 
                     <button
                       type="button"
@@ -781,6 +999,14 @@ const PaymentModal = () => {
                       <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-800 dark:bg-blue-900/20 dark:text-blue-300">
                         <p className="font-medium mb-1">UPI Payment Information</p>
                         <p>UPI ID: <span className="font-mono">{settings?.upiId || 'Not configured'}</span></p>
+                        <p className="mt-1">
+                          Status:{' '}
+                          {razorpayLoading
+                            ? 'Checking Razorpay connection...'
+                            : isRazorpayConnected
+                              ? 'Razorpay connected'
+                              : 'Razorpay not connected - using fallback QR'}
+                        </p>
                       </div>
                     )}
 

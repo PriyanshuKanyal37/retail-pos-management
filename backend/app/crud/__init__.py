@@ -9,6 +9,8 @@ from app.crud.crud_product import crud_product
 from app.crud.crud_sale import crud_sale
 from app.crud.crud_sale_item import crud_sale_item
 from app.crud.crud_setting import crud_setting
+from app.crud.crud_razorpay_connection import crud_razorpay_connection
+from app.crud.crud_razorpay_payment import crud_razorpay_payment
 
 __all__ = [
     "CRUDBase",
@@ -20,4 +22,6 @@ __all__ = [
     "crud_sale",
     "crud_sale_item",
     "crud_setting",
+    "crud_razorpay_connection",
+    "crud_razorpay_payment",
 ]

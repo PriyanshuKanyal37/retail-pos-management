@@ -17,6 +17,8 @@ from app.models.product import Product
 from app.models.sale import Sale
 from app.models.sale_item import SaleItem
 from app.models.setting import Setting
+from app.models.razorpay_connection import RazorpayConnection
+from app.models.razorpay_payment import RazorpayPayment
 
 __all__ = [
     "Base",
@@ -27,6 +29,7 @@ __all__ = [
     "Product",
     "Sale",
     "SaleItem",
-    "Setting"
+    "Setting",
+    "RazorpayConnection",
+    "RazorpayPayment"
 ]
-

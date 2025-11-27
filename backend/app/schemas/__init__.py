@@ -61,6 +61,22 @@ from app.schemas.setting import (
     SettingResponse
 )
 
+from app.schemas.razorpay_connection import (
+    RazorpayConnectionCreateRequest,
+    RazorpayConnectionUpdateRequest,
+    RazorpayConnectionResponse,
+    RazorpayConnectionStatus
+)
+
+from app.schemas.razorpay_payment import (
+    RazorpayOrderRequest,
+    RazorpayOrderCreate,
+    RazorpayPaymentUpdate,
+    RazorpayPaymentResponse,
+    RazorpayPaymentStatusResponse,
+    RazorpayOrderResponse,
+)
+
 __all__ = [
     # User schemas
     "UserCreate",
@@ -115,5 +131,18 @@ __all__ = [
     "SettingBase",
     "SettingUpdate",
     "SettingResponse",
-]
 
+    # Razorpay connection schemas
+    "RazorpayConnectionCreateRequest",
+    "RazorpayConnectionUpdateRequest",
+    "RazorpayConnectionResponse",
+    "RazorpayConnectionStatus",
+
+    # Razorpay payment schemas
+    "RazorpayOrderRequest",
+    "RazorpayOrderCreate",
+    "RazorpayPaymentUpdate",
+    "RazorpayPaymentResponse",
+    "RazorpayPaymentStatusResponse",
+    "RazorpayOrderResponse",
+]

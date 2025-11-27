@@ -11,6 +11,8 @@ from app.db.base_class import Base
 if TYPE_CHECKING:
     from app.models.user import User
     from app.models.store import Store
+    from app.models.razorpay_connection import RazorpayConnection
+    from app.models.razorpay_payment import RazorpayPayment
 
 
 class Tenant(Base):
@@ -30,6 +32,18 @@ class Tenant(Base):
 
     stores: Mapped[List["Store"]] = relationship(
         "Store",
+        back_populates="tenant",
+        cascade="all, delete-orphan",
+    )
+
+    razorpay_connections: Mapped[List["RazorpayConnection"]] = relationship(
+        "RazorpayConnection",
+        back_populates="tenant",
+        cascade="all, delete-orphan",
+    )
+
+    razorpay_payments: Mapped[List["RazorpayPayment"]] = relationship(
+        "RazorpayPayment",
         back_populates="tenant",
         cascade="all, delete-orphan",
     )

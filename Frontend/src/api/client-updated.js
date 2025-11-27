@@ -380,6 +380,20 @@ export const api = {
     },
   },
 
+  // Razorpay connection management
+  razorpay: {
+    getStatus: () => apiRequest('/razorpay/connection'),
+    connect: (credentials) => apiRequest('/razorpay/connect', {
+      method: 'POST',
+      body: credentials
+    }),
+    createOrder: (payload) => apiRequest('/razorpay/orders', {
+      method: 'POST',
+      body: payload
+    }),
+    getOrderStatus: (saleId) => apiRequest(`/razorpay/orders/${saleId}/status`)
+  },
+
   // Health check - Using public endpoints
   health: {
     check: () => apiRequest('/public/health'),

@@ -10,6 +10,7 @@ from app.db.base_class import Base
 
 if TYPE_CHECKING:
     from app.models.store import Store
+    from app.models.razorpay_payment import RazorpayPayment
 
 
 class Sale(Base):
@@ -43,3 +44,8 @@ class Sale(Base):
     customer = relationship("Customer", back_populates="sales")
     cashier = relationship("User")
     items = relationship("SaleItem", back_populates="sale", cascade="all, delete-orphan")
+    razorpay_payments = relationship(
+        "RazorpayPayment",
+        back_populates="sale",
+        cascade="all, delete-orphan"
+    )

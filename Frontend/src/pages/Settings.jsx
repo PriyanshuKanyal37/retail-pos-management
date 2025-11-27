@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import useSettingsStore from '../stores/settingsStore';
 import useUIStore from '../stores/uiStore';
 import useAuthStore from '../stores/authStore';
+import useRazorpayStore from '../stores/razorpayStore';
 import api from '../api/client-updated';
 
 const initialSettings = {
@@ -16,6 +17,11 @@ const Settings = () => {
   const updateSettings = useSettingsStore((state) => state.updateSettings);
   const showAlert = useUIStore((state) => state.showAlert);
   const role = useAuthStore((state) => state.role);
+  const razorpayStatus = useRazorpayStore((state) => state.status);
+  const fetchRazorpayStatus = useRazorpayStore((state) => state.fetchStatus);
+  const connectRazorpay = useRazorpayStore((state) => state.connect);
+  const razorpayLoading = useRazorpayStore((state) => state.isLoading);
+  const razorpayError = useRazorpayStore((state) => state.error);
 
   const isSuperAdmin = role === 'super_admin';
   const isManager = role === 'manager';
@@ -30,6 +36,11 @@ const Settings = () => {
   const [storeDetails, setStoreDetails] = useState(null);
   const [storeLoading, setStoreLoading] = useState(false);
   const [storeError, setStoreError] = useState(null);
+  const [razorpayForm, setRazorpayForm] = useState({
+    keyId: '',
+    keySecret: '',
+    mode: 'test'
+  });
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
@@ -102,6 +113,15 @@ const Settings = () => {
     };
   }, [profile?.store_id]);
 
+  useEffect(() => {
+    if (!isManager) {
+      return;
+    }
+    fetchRazorpayStatus().catch(() => {
+      // surface handled via razorpayError
+    });
+  }, [isManager, fetchRazorpayStatus]);
+
   const handleNumberChange = (event) => {
     const { name, value } = event.target;
     setFormData((prev) => ({
@@ -124,6 +144,44 @@ const Settings = () => {
       ...prev,
       [name]: value
     }));
+  };
+
+  const handleRazorpayInput = (event) => {
+    const { name, value } = event.target;
+    setRazorpayForm((prev) => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleRazorpayConnect = async (event) => {
+    event.preventDefault();
+    if (!razorpayForm.keyId.trim() || !razorpayForm.keySecret.trim()) {
+      showAlert('error', 'Both Key ID and Secret Key are required');
+      return;
+    }
+
+    try {
+      await connectRazorpay({
+        keyId: razorpayForm.keyId.trim(),
+        keySecret: razorpayForm.keySecret.trim(),
+        mode: razorpayForm.mode
+      });
+      showAlert('success', 'Connections are good');
+      setRazorpayForm((prev) => ({ ...prev, keySecret: '' }));
+    } catch (error) {
+      showAlert('error', error.message || 'Unable to connect Razorpay');
+    }
+  };
+
+  const formatDateTime = (value) => {
+    if (!value) return '—';
+    try {
+      const date = value instanceof Date ? value : new Date(value);
+      return date.toLocaleString();
+    } catch {
+      return '—';
+    }
   };
 
   const handlePasswordUpdate = (event) => {
@@ -297,6 +355,108 @@ const Settings = () => {
               </div>
             </div>
             {storeError && <p className="mt-4 text-sm text-red-500">{storeError}</p>}
+          </section>
+        )}
+
+        {isManager && (
+          <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <div className="border-b border-gray-200 pb-4 dark:border-gray-700">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Razorpay Connection</h2>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Link your store’s Razorpay API credentials. Managers can replace them anytime.
+              </p>
+            </div>
+            <div className="mt-6 grid gap-6 lg:grid-cols-2">
+              <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Status</p>
+                <p
+                  className={`mt-2 text-lg font-semibold ${
+                    razorpayStatus?.isConnected ? 'text-green-600' : 'text-yellow-600'
+                  }`}
+                >
+                  {razorpayStatus?.isConnected ? 'Connections are good' : 'Not connected'}
+                </p>
+                <dl className="mt-4 space-y-2 text-sm text-gray-600 dark:text-gray-300">
+                  <div className="flex justify-between">
+                    <dt>Mode</dt>
+                    <dd className="font-medium">{razorpayStatus?.mode ?? '—'}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt>Key ID</dt>
+                    <dd className="font-mono">
+                      {razorpayStatus?.keyIdLast4 ? `****${razorpayStatus.keyIdLast4}` : '—'}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt>Connected At</dt>
+                    <dd>{formatDateTime(razorpayStatus?.connectedAt)}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt>Last Updated</dt>
+                    <dd>{formatDateTime(razorpayStatus?.updatedAt)}</dd>
+                  </div>
+                </dl>
+                {razorpayError && (
+                  <p className="mt-4 text-sm text-red-500 dark:text-red-400">{razorpayError}</p>
+                )}
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Razorpay Key ID
+                  </label>
+                  <input
+                    type="text"
+                    name="keyId"
+                    value={razorpayForm.keyId}
+                    onChange={handleRazorpayInput}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                    placeholder="rzp_test_***"
+                    autoComplete="off"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Razorpay Secret Key
+                  </label>
+                  <input
+                    type="password"
+                    name="keySecret"
+                    value={razorpayForm.keySecret}
+                    onChange={handleRazorpayInput}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                    placeholder="Enter secret key"
+                    autoComplete="new-password"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Mode
+                  </label>
+                  <select
+                    name="mode"
+                    value={razorpayForm.mode}
+                    onChange={handleRazorpayInput}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                  >
+                    <option value="test">Test</option>
+                    <option value="live">Live</option>
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRazorpayConnect}
+                  disabled={razorpayLoading}
+                  className="inline-flex w-full items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {razorpayLoading
+                    ? 'Connecting...'
+                    : razorpayStatus?.isConnected
+                      ? 'Replace Credentials'
+                      : 'Connect Razorpay'}
+                </button>
+              </div>
+            </div>
           </section>
         )}
 

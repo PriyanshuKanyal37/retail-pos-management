@@ -108,6 +108,7 @@ def get_store_id(
 from app.services.storage_service import SupabaseStorageService
 from app.services.product_service import ProductService
 from app.services.sales_service import SalesService
+from app.services.razorpay import RazorpayConnectionService, RazorpayPaymentService
 
 def get_storage_service() -> SupabaseStorageService:
     """Get storage service dependency"""
@@ -126,3 +127,17 @@ def get_sales_service(
 ) -> SalesService:
     """Get sales service dependency"""
     return SalesService(db, storage)
+
+
+def get_razorpay_connection_service(
+    db: Session = Depends(get_db_session),
+) -> RazorpayConnectionService:
+    """Get Razorpay connection service dependency"""
+    return RazorpayConnectionService(db)
+
+
+def get_razorpay_payment_service(
+    db: Session = Depends(get_db_session),
+) -> RazorpayPaymentService:
+    """Get Razorpay payment service dependency"""
+    return RazorpayPaymentService(db)
