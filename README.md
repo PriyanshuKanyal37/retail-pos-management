@@ -43,7 +43,7 @@
 ### 💰 Point of Sale Operations
 - **🛍️ Product Management**: Complete inventory tracking with barcode support
 - **🛒 Shopping Cart**: Real-time cart management with quantity controls
-- **💳 Payment Processing**: Multiple payment methods (Cash, Card, UPI)
+- **💳 Payment Processing**: Cash, card, and UPI plus Razorpay Checkout with automatic QR/order amounts
 - **🧾 Invoice Generation**: Automatic invoice creation with PDF export
 - **📈 Sales Analytics**: Real-time sales statistics and reporting
 
@@ -234,6 +234,9 @@ SUPABASE_PROJECT_URL=your-project-url
 SUPABASE_PRODUCTS_BUCKET=products
 SUPABASE_INVOICES_BUCKET=invoices
 SUPABASE_BRANDING_BUCKET=branding
+
+# Payments
+RAZORPAY_ENABLE_VALIDATION=true      # Toggle server-side credential validation with Razorpay API
 ```
 
 #### Frontend (.env)
@@ -250,6 +253,14 @@ VITE_APP_VERSION=1.0.0
 VITE_ENABLE_ANALYTICS=false
 VITE_ENABLE_DEBUG=true
 ```
+
+### Razorpay Setup Checklist
+
+1. **Install dependencies**: Ensure the backend includes the official `razorpay` Python SDK (already listed in `backend/requirements.txt`).
+2. **Set the env flag**: Keep `RAZORPAY_ENABLE_VALIDATION=true` so manager-submitted keys are validated against Razorpay before storage.
+3. **Apply the SQL**: Run the statements in `New_schema.md` to create `razorpay_connections` and `razorpay_payments` with their triggers/RLS policies.
+4. **Store-level connection**: Managers open **Settings -> Payments -> Razorpay**, enter their store's Key ID + Secret, and click **Connect** until the UI shows "Connections are good."
+5. **POS payment flow**: Cashiers/managers ring up a sale, choose the Razorpay/UPI option, show the QR with auto-filled total, and continue once payment success appears.
 
 ## 🏃‍♂️ Usage
 
